@@ -10,30 +10,25 @@ Use Python 3.5::
     pip install -e .
 
 
-Usage
------
+Using docker
+------------------
 
-Start ZeroMQ broker::
+Build dd-crawler image::
 
-    python -m frontera.contrib.messagebus.zeromq.broker
+    docker build -t dd-crawler .
 
-Start DB worker that reads incoming log::
+Start everything (this will take seeds from local ``seeds.txt``)::
 
-    python -m frontera.worker.db --config dd_crawler.frontera.worker_settings --no-incoming
+    docker-compose up
 
-Start DB workers that generate new batches::
 
-    python -m frontera.worker.db --config dd_crawler.frontera.worker_settings --no-batches
+The number of spider workers in ``docker-compose.yml``
+must match ``SPIDER_FEED_PARTITIONS`` in ``dd_crawler.frontera.common_settings``.
 
-Start strategy workers::
+TODO:
 
-    python -m frontera.worker.strategy \
-        --config dd_crawler.frontera.worker_settings \
-        --strategy frontera.worker.strategies.bfs.CrawlingStrategy \
-        --partition-id 0
-
-Start spider workers::
-
-    scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=0 -s SEEDS_SOURCE=seeds.txt
-    scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=1
-
+- use mysql database
+- expose brocker and sql database (to allow connection from external machines)
+- use strategy workers and two separate db workers
+- add or generate an "external" docker-compose
+- do something with numbers of spider and strategy workers

@@ -1,0 +1,8 @@
+*
+!setup.py
+!requirements.txt
+!logging.conf
+!dd_crawler
+!scrapy.cfg
+**/__pycache__
+**/*.pyc
