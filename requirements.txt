@@ -1,0 +1,2 @@
+scrapy==1.1.0
+-e git+https://github.com/lopuhin/frontera.git@py3-distributed#egg=frontera[sql,distributed,zeromq,logging]
