@@ -3,8 +3,7 @@
 !requirements.txt
 !logging.conf
 !dd_crawler
-!dnsmasq
+!docker
 !scrapy.cfg
-!dns_crawl.sh
 **/__pycache__
 **/*.pyc

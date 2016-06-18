@@ -21,9 +21,6 @@ Start everything (this will take seeds from local ``seeds.txt``)::
 
     docker-compose up
 
-Currently it will fail to start properly for the first time due to db starting
-slower, so you have to stop it and start once again.
-
 Crawled items will be written in CDR format to the local ``./out`` folder,
 one ``items_[0-n].jl`` file for each spider worker.
 

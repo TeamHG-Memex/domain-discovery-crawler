@@ -24,10 +24,7 @@ services:
 
   db-worker-batches:
     image: dd-crawler
-    command: [
-      python, -m, frontera.worker.db,
-       --config=dd_crawler.frontera.worker_settings,
-       --no-incoming]
+    command: /dd_crawler/docker/db_worker.sh --no-incoming
     links:
       - zeromq-broker
     depends_on:
@@ -35,10 +32,7 @@ services:
 
   db-worker-incoming-0:
     image: dd-crawler
-    command: [
-      python, -m, frontera.worker.db,
-       --config=dd_crawler.frontera.worker_settings,
-       --no-batches]
+    command: /dd_crawler/docker/db_worker.sh --no-batches
     links:
       - zeromq-broker
     depends_on:
@@ -46,11 +40,7 @@ services:
 
   strategy-worker:
     image: dd-crawler
-    command: [
-      python, -m, frontera.worker.strategy,
-      --config=dd_crawler.frontera.worker_settings,
-      --strategy=frontera.worker.strategies.bfs.CrawlingStrategy,
-      --partition-id=0]
+    command: /dd_crawler/docker/st_worker.sh --partition-id=0
     links:
       - zeromq-broker
     depends_on:
@@ -61,7 +51,7 @@ services:
     volumes:
       - ./seeds.txt:/dd_crawler/seeds.txt
       - ./out:/dd_crawler/out
-    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=0 -s SEEDS_SOURCE=/dd_crawler/seeds.txt -o /dd_crawler/out/items_0.jl
+    command: /dd_crawler/docker/sp_worker.sh 0 -s SEEDS_SOURCE=/dd_crawler/seeds.txt
     dns:
       - 127.0.0.1
     links:
@@ -71,7 +61,7 @@ services:
     image: dd-crawler
     volumes:
       - ./out:/dd_crawler/out
-    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=1 -o /dd_crawler/out/items_1.jl
+    command: /dd_crawler/docker/sp_worker.sh 1
     dns:
       - 127.0.0.1
     links:
@@ -81,7 +71,7 @@ services:
     image: dd-crawler
     volumes:
       - ./out:/dd_crawler/out
-    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=2 -o /dd_crawler/out/items_2.jl
+    command: /dd_crawler/docker/sp_worker.sh 2
     dns:
       - 127.0.0.1
     links:
@@ -91,7 +81,7 @@ services:
     image: dd-crawler
     volumes:
       - ./out:/dd_crawler/out
-    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=3 -o /dd_crawler/out/items_3.jl
+    command: /dd_crawler/docker/sp_worker.sh 3
     dns:
       - 127.0.0.1
     links:
