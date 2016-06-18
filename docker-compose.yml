@@ -2,66 +2,67 @@ version: '2'
 
 services:
 
-  dnsmasq:
-    build: dnsmasq
-    ports:
-      - "53:53"
+  zeromq-broker:
+    image: dd-crawler
+    command: python -m frontera.contrib.messagebus.zeromq.broker --address *
+    expose:
+      - "5550-5555"
 
- #zeromq-broker:
- #  image: dd-crawler
- #  command: python -m frontera.contrib.messagebus.zeromq.broker --address *
- #  expose:
- #    - "5550-5555"
+  db-worker:
+    image: dd-crawler
+    command: [
+      python, -m, frontera.worker.db,
+       --config=dd_crawler.frontera.worker_settings]
+    links:
+      - zeromq-broker
 
- #db-worker:
- #  image: dd-crawler
- #  command: [
- #    python, -m, frontera.worker.db,
- #     --config=dd_crawler.frontera.worker_settings]
- #  links:
- #    - zeromq-broker
+# strategy-worker:
+#   image: dd-crawler
+#   command: [
+#     python, -m, frontera.worker.strategy,
+#     --config=dd_crawler.frontera.worker_settings,
+#     --strategy=frontera.worker.strategies.bfs.CrawlingStrategy,
+#     --partition-id=0]
+#   links:
+#     - zeromq-broker
 
-##strategy-worker:
-##  image: dd-crawler
-##  command: [
-##    python, -m, frontera.worker.strategy,
-##    --config=dd_crawler.frontera.worker_settings,
-##    --strategy=frontera.worker.strategies.bfs.CrawlingStrategy,
-##    --partition-id=0]
-##  links:
-##    - zeromq-broker
+  spider-worker-0:
+    image: dd-crawler
+    volumes:
+      - ./seeds.txt:/dd_crawler/seeds.txt
+      - ./out:/dd_crawler/out
+    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=0 -s SEEDS_SOURCE=/dd_crawler/seeds.txt -o /dd_crawler/out/items_0.jl
+    dns:
+      - 127.0.0.1
+    links:
+      - zeromq-broker
 
- #spider-worker-0:
- #  image: dd-crawler
- #  volumes:
- #    - ./seeds.txt:/dd_crawler/seeds.txt
- #    - ./out:/dd_crawler/out
- #  command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=0 -s SEEDS_SOURCE=/dd_crawler/seeds.txt -o /dd_crawler/out/items_0.jl
- #  links:
- #    - zeromq-broker
- #  dns:
- #    - 127.0.0.1
+  spider-worker-1:
+    image: dd-crawler
+    volumes:
+      - ./out:/dd_crawler/out
+    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=1 -o /dd_crawler/out/items_1.jl
+    dns:
+      - 127.0.0.1
+    links:
+      - zeromq-broker
 
- #spider-worker-1:
- #  image: dd-crawler
- #  volumes:
- #    - ./out:/dd_crawler/out
- #  command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=1 -o /dd_crawler/out/items_1.jl
- #  links:
- #    - zeromq-broker
+  spider-worker-2:
+    image: dd-crawler
+    volumes:
+      - ./out:/dd_crawler/out
+    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=2 -o /dd_crawler/out/items_2.jl
+    dns:
+      - 127.0.0.1
+    links:
+      - zeromq-broker
 
- #spider-worker-2:
- #  image: dd-crawler
- #  volumes:
- #    - ./out:/dd_crawler/out
- #  command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=2 -o /dd_crawler/out/items_2.jl
- #  links:
- #    - zeromq-broker
-
- #spider-worker-3:
- #  image: dd-crawler
- #  command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=3 -o /dd_crawler/out/items_3.jl
- #  volumes:
- #    - ./out:/dd_crawler/out
- #  links:
- #    - zeromq-broker
+  spider-worker-3:
+    image: dd-crawler
+    volumes:
+      - ./out:/dd_crawler/out
+    command: /dd_crawler/dns_crawl.sh dd_crawler -s SPIDER_PARTITION_ID=3 -o /dd_crawler/out/items_3.jl
+    dns:
+      - 127.0.0.1
+    links:
+      - zeromq-broker
