@@ -3,7 +3,7 @@ from frontera.settings.default_settings import MIDDLEWARES
 from .common_settings import *
 
 
-SPIDER_LOG_PARTITIONS = 1
+SPIDER_LOG_PARTITIONS = 2
 MAX_NEXT_REQUESTS = 512
 
 

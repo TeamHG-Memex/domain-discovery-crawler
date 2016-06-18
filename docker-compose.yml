@@ -38,13 +38,31 @@ services:
     depends_on:
       - frontera-db
 
-  strategy-worker:
+  db-worker-incoming-1:
+    image: dd-crawler
+    command: /dd_crawler/docker/db_worker.sh --no-batches
+    links:
+      - zeromq-broker
+    depends_on:
+      - frontera-db
+      - db-worker-incoming-0
+
+  strategy-worker-0:
     image: dd-crawler
     command: /dd_crawler/docker/st_worker.sh --partition-id=0
     links:
       - zeromq-broker
     depends_on:
       - frontera-db
+
+  strategy-worker-1:
+    image: dd-crawler
+    command: /dd_crawler/docker/st_worker.sh --partition-id=1
+    links:
+      - zeromq-broker
+    depends_on:
+      - frontera-db
+      - strategy-worker-0
 
   spider-worker-0:
     image: dd-crawler
