@@ -7,8 +7,8 @@ SPIDER_LOG_PARTITIONS = 1
 MAX_NEXT_REQUESTS = 512
 
 
-BACKEND = 'frontera.contrib.backends.sqlalchemy.SQLAlchemyBackend'
-# BACKEND = 'frontera.contrib.backends.sqlalchemy.Distributed'
+# BACKEND = 'frontera.contrib.backends.sqlalchemy.SQLAlchemyBackend'
+BACKEND = 'frontera.contrib.backends.sqlalchemy.Distributed'
 
 
 SQLALCHEMYBACKEND_ENGINE = 'postgresql+psycopg2://ddc:ddc@frontera-db/frontera'

@@ -22,25 +22,39 @@ services:
     expose:
       - "5550-5555"
 
-  db-worker:
+  db-worker-batches:
     image: dd-crawler
     command: [
       python, -m, frontera.worker.db,
-       --config=dd_crawler.frontera.worker_settings]
+       --config=dd_crawler.frontera.worker_settings,
+       --no-incoming]
     links:
       - zeromq-broker
     depends_on:
       - frontera-db
 
-# strategy-worker:
-#   image: dd-crawler
-#   command: [
-#     python, -m, frontera.worker.strategy,
-#     --config=dd_crawler.frontera.worker_settings,
-#     --strategy=frontera.worker.strategies.bfs.CrawlingStrategy,
-#     --partition-id=0]
-#   links:
-#     - zeromq-broker
+  db-worker-incoming-0:
+    image: dd-crawler
+    command: [
+      python, -m, frontera.worker.db,
+       --config=dd_crawler.frontera.worker_settings,
+       --no-batches]
+    links:
+      - zeromq-broker
+    depends_on:
+      - frontera-db
+
+  strategy-worker:
+    image: dd-crawler
+    command: [
+      python, -m, frontera.worker.strategy,
+      --config=dd_crawler.frontera.worker_settings,
+      --strategy=frontera.worker.strategies.bfs.CrawlingStrategy,
+      --partition-id=0]
+    links:
+      - zeromq-broker
+    depends_on:
+      - frontera-db
 
   spider-worker-0:
     image: dd-crawler
