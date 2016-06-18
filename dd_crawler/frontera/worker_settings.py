@@ -11,7 +11,7 @@ BACKEND = 'frontera.contrib.backends.sqlalchemy.SQLAlchemyBackend'
 # BACKEND = 'frontera.contrib.backends.sqlalchemy.Distributed'
 
 
-SQLALCHEMYBACKEND_ENGINE = 'sqlite:///url_storage.sqlite'
+SQLALCHEMYBACKEND_ENGINE = 'postgresql+psycopg2://ddc:ddc@frontera-db/frontera'
 SQLALCHEMYBACKEND_ENGINE_ECHO = False
 SQLALCHEMYBACKEND_DROP_ALL_TABLES = False
 SQLALCHEMYBACKEND_CLEAR_CONTENT = False

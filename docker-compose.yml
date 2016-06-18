@@ -1,6 +1,20 @@
 version: '2'
 
+
+volumes:
+  frontera-db: {}
+
+
 services:
+
+  frontera-db:
+    image: postgres:9.5
+    volumes:
+      - frontera-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: "frontera"
+      POSTGRES_USER: "ddc"
+      POSTGRES_PASSWORD: "ddc"
 
   zeromq-broker:
     image: dd-crawler
@@ -15,6 +29,8 @@ services:
        --config=dd_crawler.frontera.worker_settings]
     links:
       - zeromq-broker
+    depends_on:
+      - frontera-db
 
 # strategy-worker:
 #   image: dd-crawler
