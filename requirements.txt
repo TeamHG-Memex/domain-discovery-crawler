@@ -1,3 +1,3 @@
 scrapy==1.1.0
-git+https://github.com/TeamHG-Memex/scrapy-cdr.git
+scrapy-cdr
 git+https://github.com/lopuhin/frontera.git@py3-distributed#egg=frontera[sql,distributed,zeromq,logging]

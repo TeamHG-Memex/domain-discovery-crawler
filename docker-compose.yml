@@ -30,24 +30,31 @@ services:
     image: dd-crawler
     volumes:
       - ./seeds.txt:/dd_crawler/seeds.txt
-    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=0 -s SEEDS_SOURCE=/dd_crawler/seeds.txt
+      - ./out:/dd_crawler/out
+    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=0 -s SEEDS_SOURCE=/dd_crawler/seeds.txt -o /dd_crawler/out/items_0.jl
     links:
       - zeromq-broker
 
   spider-worker-1:
     image: dd-crawler
-    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=1
+    volumes:
+      - ./out:/dd_crawler/out
+    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=1 -o /dd_crawler/out/items_1.jl
     links:
       - zeromq-broker
 
   spider-worker-2:
     image: dd-crawler
-    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=2
+    volumes:
+      - ./out:/dd_crawler/out
+    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=2 -o /dd_crawler/out/items_2.jl
     links:
       - zeromq-broker
 
   spider-worker-3:
     image: dd-crawler
-    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=3
+    command: scrapy crawl dd_crawler -s SPIDER_PARTITION_ID=3 -o /dd_crawler/out/items_3.jl
+    volumes:
+      - ./out:/dd_crawler/out
     links:
       - zeromq-broker
