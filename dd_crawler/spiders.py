@@ -1,6 +1,10 @@
+import re
+from urllib.parse import urlsplit
+
 from scrapy import Spider, Request
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
+from scrapy_cdr.utils import text_cdr_item
 
 
 class GeneralSpider(Spider):
@@ -11,11 +15,24 @@ class GeneralSpider(Spider):
         self.le = LinkExtractor()
 
     def parse(self, response):
-        self.logger.info('Parse {}'.format(response))
         if not isinstance(response, HtmlResponse):
             return
 
+        domain = _get_domain(response.url)
+
         for link in self.le.extract_links(response):
-            r = Request(url=link.url)
-            r.meta.update(link_text=link.text)
-            yield r
+            if _get_domain(link.url) == domain:
+                r = Request(url=link.url)
+                r.meta.update(link_text=link.text)
+                yield r
+
+        yield text_cdr_item(
+            response,
+            crawler_name=self.settings.get('CDR_CRAWLER'),
+            team_name=self.settings.get('CDR_TEAM'),
+        )
+
+
+def _get_domain(url):
+    domain = urlsplit(url).netloc
+    return re.sub(r'^www\.', '', domain)
