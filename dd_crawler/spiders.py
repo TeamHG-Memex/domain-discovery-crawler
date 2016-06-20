@@ -21,6 +21,9 @@ class GeneralSpider(Spider):
         domain = _get_domain(response.url)
 
         for link in self.le.extract_links(response):
+            # This is a "soft" domain check: we are not guaranteed to stay
+            # within one domain, but do not follow out-domain links. This
+            # means that we only change domain during redirects.
             if _get_domain(link.url) == domain:
                 r = Request(url=link.url)
                 r.meta.update(link_text=link.text)
