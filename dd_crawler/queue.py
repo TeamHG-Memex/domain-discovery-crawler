@@ -16,7 +16,8 @@ class RequestQueue(Base):
         self.len_key = '{}:len'.format(self.key)
         self.queues_key = '{}:queues'.format(self.key)
         self.workers_key = '{}:workers'.format(self.key)
-        self.worker_id = self.server.incr('{}:worker-id'.format(self.key))
+        self.worker_id_key = '{}:worker-id'.format(self.key)
+        self.worker_id = self.server.incr(self.worker_id_key)
         self.alive_timeout = 10  # seconds
         self.im_alive()
 
@@ -37,11 +38,25 @@ class RequestQueue(Base):
         if queue_key:
             return self.pop_from_queue(queue_key)
 
+    def clear(self):
+        keys = {
+            self.len_key, self.queues_key, self.workers_key, self.worker_id_key}
+        keys.update(self.get_workers())
+        keys.update(self.get_queues())
+        self.server.delete(*keys)
+        super().clear()
+
+    def get_queues(self):
+        return self.server.smembers(self.queues_key)
+
+    def get_workers(self):
+        return self.server.smembers(self.workers_key)
+
     def select_queue_key(self):
         """ Select which queue (domain) to use next.
         """
         idx, n_idx = self.discover()
-        queues = self.server.smembers(self.queues_key)
+        queues = self.get_queues()
         if queues:
             my_queues = [q for q in queues if crc32(q) % n_idx == idx]
             # TODO: select based on priority and available slots
@@ -53,7 +68,7 @@ class RequestQueue(Base):
         of domains between workers, but this is not an issue.
         """
         self.im_alive()
-        worker_ids = set(map(int, self.server.smembers(self.workers_key)))
+        worker_ids = set(map(int, self.get_workers()))
         for worker_id in list(worker_ids):
             if not self.is_alive(worker_id):
                 self.server.srem(self.workers_key, worker_id)
