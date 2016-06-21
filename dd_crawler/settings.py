@@ -5,26 +5,6 @@ NEWSPIDER_MODULE = 'dd_crawler.spiders'
 
 #USER_AGENT = 'topic (+http://www.yourdomain.com)'
 
-FRONTERA_SETTINGS = 'dd_crawler.frontera.spider_settings'
-
-SPIDER_MIDDLEWARES = {
-    'frontera.contrib.scrapy.middlewares.schedulers.SchedulerSpiderMiddleware': 1000,
-    'scrapy.spidermiddleware.depth.DepthMiddleware': None,
-    'scrapy.spidermiddleware.offsite.OffsiteMiddleware': None,
-    'scrapy.spidermiddleware.referer.RefererMiddleware': None,
-    'scrapy.spidermiddleware.urllength.UrlLengthMiddleware': None
-}
-
-DOWNLOADER_MIDDLEWARES = {
-    'frontera.contrib.scrapy.middlewares.schedulers.SchedulerDownloaderMiddleware': 1000,
-}
-
-SCHEDULER = 'frontera.contrib.scrapy.schedulers.frontier.FronteraScheduler'
-# TODO - move to a different approach of seed loading
-SPIDER_MIDDLEWARES.update({
-    'frontera.contrib.scrapy.middlewares.seeds.file.FileSeedLoader': 1,
-})
-
 
 HTTPCACHE_ENABLED = False
 REDIRECT_ENABLED = True

@@ -1,2 +1,0 @@
-SPIDER_FEED_PARTITIONS = 4
-ZMQ_ADDRESS = 'zeromq-broker'
