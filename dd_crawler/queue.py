@@ -2,8 +2,12 @@ import random
 from urllib.parse import urlsplit
 from zlib import crc32
 from typing import Tuple
+import logging
 
 from scrapy_redis.queue import Base
+
+
+logger = logging.getLogger(__name__)
 
 
 class RequestQueue(Base):
@@ -13,6 +17,7 @@ class RequestQueue(Base):
         self.queues_key = '{}:queues'.format(self.key)
         self.workers_key = '{}:workers'.format(self.key)
         self.worker_id = self.server.incr('{}:worker-id'.format(self.key))
+        self.alive_timeout = 10  # seconds
         self.im_alive()
 
     def __len__(self):
@@ -53,14 +58,19 @@ class RequestQueue(Base):
             if not self.is_alive(worker_id):
                 self.server.srem(self.workers_key, worker_id)
                 worker_ids.remove(worker_id)
-        worker_ids = sorted(worker_ids)
-        return worker_ids.index(self.worker_id), len(worker_ids)
+        if self.worker_id in worker_ids:
+            worker_ids = sorted(worker_ids)
+            return worker_ids.index(self.worker_id), len(worker_ids)
+        else:
+            # This should not happen normally
+            logger.warning('No live workers: selecting self!')
+            return 0, 1
 
     def im_alive(self):
         pipe = self.server.pipeline()
         pipe.multi()
         pipe.sadd(self.workers_key, self.worker_id)\
-            .set(self._worker_key(self.worker_id), 'ok', ex=10)\
+            .set(self._worker_key(self.worker_id), 'ok', ex=self.alive_timeout)\
             .execute()
 
     def is_alive(self, worker_id):
