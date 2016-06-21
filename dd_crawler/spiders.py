@@ -14,6 +14,15 @@ class GeneralSpider(Spider):
         super(GeneralSpider, self).__init__(*args, **kwargs)
         self.le = LinkExtractor()
 
+    def start_requests(self):
+        if self.settings.get('SEEDS'):
+            with open(self.settings.get('SEEDS')) as f:
+                urls = [line.strip() for line in f]
+            for url in urls:
+                yield Request(url)
+        else:
+            super().start_requests()
+
     def parse(self, response):
         if not isinstance(response, HtmlResponse):
             return
@@ -25,9 +34,7 @@ class GeneralSpider(Spider):
             # within one domain, but do not follow out-domain links. This
             # means that we only change domain during redirects.
             if _get_domain(link.url) == domain:
-                r = Request(url=link.url)
-                r.meta.update(link_text=link.text)
-                yield r
+                yield Request(url=link.url)
 
         yield text_cdr_item(
             response,
