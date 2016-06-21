@@ -1,5 +1,7 @@
 import random
 from urllib.parse import urlsplit
+from zlib import crc32
+from typing import Tuple
 
 from scrapy_redis.queue import Base
 
@@ -9,6 +11,9 @@ class RequestQueue(Base):
         super().__init__(*args, **kwargs)
         self.len_key = '{}:len'.format(self.key)
         self.queues_key = '{}:queues'.format(self.key)
+        self.workers_key = '{}:workers'.format(self.key)
+        self.worker_id = self.server.incr('{}:worker-id'.format(self.key))
+        self.im_alive()
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -30,12 +35,39 @@ class RequestQueue(Base):
     def select_queue_key(self):
         """ Select which queue (domain) to use next.
         """
-        # TODO:
-        # - pin domain to worker
-        # - select based on priority and available slots
+        idx, n_idx = self.discover()
         queues = self.server.smembers(self.queues_key)
         if queues:
-            return random.choice(list(queues))
+            my_queues = [q for q in queues if crc32(q) % n_idx == idx]
+            # TODO: select based on priority and available slots
+            return random.choice(my_queues)
+
+    def discover(self) -> Tuple[int, int]:
+        """ Return a tuple of (my index, total number of workers).
+        When workers connect or disconnect, this will cause re-distribution
+        of domains between workers, but this is not an issue.
+        """
+        self.im_alive()
+        worker_ids = set(map(int, self.server.smembers(self.workers_key)))
+        for worker_id in list(worker_ids):
+            if not self.is_alive(worker_id):
+                self.server.srem(self.workers_key, worker_id)
+                worker_ids.remove(worker_id)
+        worker_ids = sorted(worker_ids)
+        return worker_ids.index(self.worker_id), len(worker_ids)
+
+    def im_alive(self):
+        pipe = self.server.pipeline()
+        pipe.multi()
+        pipe.sadd(self.workers_key, self.worker_id)\
+            .set(self._worker_key(self.worker_id), 'ok', ex=10)\
+            .execute()
+
+    def is_alive(self, worker_id):
+        return bool(self.server.get(self._worker_key(worker_id)))
+
+    def _worker_key(self, worker_id):
+        return '{}:worker-{}'.format(self.key, worker_id)
 
     def pop_from_queue(self, queue_key):
         """ Pop value with highest priority from the given queue.
