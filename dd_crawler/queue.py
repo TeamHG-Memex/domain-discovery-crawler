@@ -7,6 +7,8 @@ import logging
 import scrapy
 from scrapy_redis.queue import Base
 
+from .utils import warn_if_slower
+
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,7 @@ class RequestQueue(Base):
     def get_workers(self):
         return self.server.smembers(self.workers_key)
 
+    @warn_if_slower(0.01, logger)
     def select_queue_key(self):
         """ Select which queue (domain) to use next.
         """
@@ -71,8 +74,9 @@ class RequestQueue(Base):
         queues = self.get_queues()
         if queues:
             my_queues = [q for q in queues if crc32(q) % n_idx == idx]
-            # TODO: select based on priority and available slots
-            return random.choice(my_queues)
+            if my_queues:
+                # TODO: select based on priority and available slots
+                return random.choice(my_queues)
 
     def discover(self) -> Tuple[int, int]:
         """ Return a tuple of (my index, total number of workers).
