@@ -110,6 +110,9 @@ class RequestQueue(Base):
         if results:
             self.server.decr(self.len_key)
             return self._decode_request(results[0])
+        else:
+            # queue was empty: remove it from queues set
+            self.server.srem(self.queues_key, queue_key)
 
     def request_queue_key(self, request):
         """ Key for request queue (based on it's domain).
