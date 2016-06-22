@@ -147,8 +147,12 @@ class CompactRequestQueue(RequestQueue):
     """
 
     def _encode_request(self, request):
-        return '{} {}'.format(int(request.priority), request.url)
+        return '{} {} {}'.format(
+            int(request.priority),
+            request.meta.get('depth', 0),
+            request.url)
 
     def _decode_request(self, encoded_request):
-        priority, url = encoded_request.decode('utf-8').split(' ', 1)
-        return scrapy.Request(url, priority=int(priority))
+        priority, depth, url = encoded_request.decode('utf-8').split(' ', 2)
+        return scrapy.Request(
+            url, priority=int(priority), meta={'depth': int(depth)})
