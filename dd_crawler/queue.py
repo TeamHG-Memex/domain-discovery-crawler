@@ -3,6 +3,8 @@ from urllib.parse import urlsplit
 from zlib import crc32
 from typing import Tuple
 import logging
+import time
+from functools import lru_cache
 
 import scrapy
 from scrapy_redis.queue import Base
@@ -30,6 +32,7 @@ class RequestQueue(Base):
         self.im_alive()
         self.n_pops = 0
         self.stat_each = 1000 # requests
+        self.queue_cache_time = 3  # seconds
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -63,10 +66,18 @@ class RequestQueue(Base):
     def get_queues(self):
         return self.server.smembers(self.queues_key)
 
+    def get_queues_cached(self):
+        cache_key = int(time.time() / self.queue_cache_time)
+        return self._get_queues_cached(cache_key)
+
+    @lru_cache(maxsize=1)
+    def _get_queues_cached(self, _):
+        return self.get_queues()
+
     def get_workers(self):
         return self.server.smembers(self.workers_key)
 
-    @warn_if_slower(0.01, logger)
+    @warn_if_slower(0.1, logger)
     def select_queue_key(self):
         """ Select which queue (domain) to use next.
         """
