@@ -4,6 +4,7 @@ from zlib import crc32
 from typing import Tuple
 import logging
 
+import scrapy
 from scrapy_redis.queue import Base
 
 
@@ -120,3 +121,16 @@ class RequestQueue(Base):
             n_domains=len(queues),
             queues={name: self.server.zcard(name) for name in queues},
         )
+
+
+class CompactRequestQueue(RequestQueue):
+    """ Queue with a more compact request representation:
+    in our case, we need to preserve only url and priority.
+    """
+
+    def _encode_request(self, request):
+        return '{} {}'.format(int(request.priority), request.url)
+
+    def _decode_request(self, encoded_request):
+        priority, url = encoded_request.decode('utf-8').split(' ', 1)
+        return scrapy.Request(url, priority=int(priority))
