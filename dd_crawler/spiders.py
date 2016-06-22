@@ -13,8 +13,10 @@ class GeneralSpider(Spider):
     def __init__(self, *args, **kwargs):
         super(GeneralSpider, self).__init__(*args, **kwargs)
         self.le = LinkExtractor()
+        self.domain_limit = False
 
     def start_requests(self):
+        self.domain_limit = self.settings.getbool('DOMAIN_LIMIT')
         if self.settings.get('SEEDS'):
             with open(self.settings.get('SEEDS')) as f:
                 urls = [line.strip() for line in f]
@@ -27,13 +29,9 @@ class GeneralSpider(Spider):
         if not isinstance(response, HtmlResponse):
             return
 
-        domain = _get_domain(response.url)
-
+        domain = _get_domain(response.request.url)
         for link in self.le.extract_links(response):
-            # This is a "soft" domain check: we are not guaranteed to stay
-            # within one domain, but do not follow out-domain links. This
-            # means that we only change domain during redirects.
-            if _get_domain(link.url) == domain:
+            if not self.domain_limit or _get_domain(link.url) == domain:
                 yield Request(url=link.url)
 
         yield text_cdr_item(
