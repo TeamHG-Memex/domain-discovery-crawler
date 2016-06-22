@@ -11,6 +11,11 @@ from scrapy_redis.queue import Base
 logger = logging.getLogger(__name__)
 
 
+# Note about race conditions: there are several workers executing this code, but
+# - Redis itself is single-threaded
+# - only one worker should be crawling given domain
+
+
 class RequestQueue(Base):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
