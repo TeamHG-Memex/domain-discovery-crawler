@@ -14,12 +14,8 @@ class GeneralSpider(Spider):
     def __init__(self, *args, **kwargs):
         super(GeneralSpider, self).__init__(*args, **kwargs)
         self.le = LinkExtractor()
-        self.domain_limit = False
-        self.reset_depth = False
 
     def start_requests(self):
-        self.domain_limit = self.settings.getbool('DOMAIN_LIMIT')
-        self.reset_depth = self.settings.getbool('RESET_DEPTH')
         if self.settings.get('SEEDS'):
             with open(self.settings.get('SEEDS')) as f:
                 urls = [line.strip() for line in f]
@@ -32,12 +28,14 @@ class GeneralSpider(Spider):
         if not isinstance(response, HtmlResponse):
             return
 
+        domain_limit = self.settings.getbool('DOMAIN_LIMIT')
+        reset_depth = self.settings.getbool('RESET_DEPTH')
         domain = _get_domain(response.request.url)
         for link in self.le.extract_links(response):
             different_domain = _get_domain(link.url) != domain
-            if not (self.domain_limit and different_domain):
+            if not (domain_limit and different_domain):
                 with _reset_depth_if(
-                        self.reset_depth and different_domain, response):
+                        reset_depth and different_domain, response):
                     yield Request(url=link.url)
 
         yield text_cdr_item(
