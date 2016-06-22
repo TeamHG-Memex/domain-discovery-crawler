@@ -45,7 +45,7 @@ class RequestQueue(Base):
             self.server.incr(self.len_key)
         queue_added = self.server.sadd(self.queues_key, queue_key)
         if queue_added:
-            logger.debug('Added new queue {}'.format(queue_key))
+            logger.info('ADD queue {}'.format(queue_key))
             self.server.incr(self.queues_id_key)
 
     def pop(self, timeout=0):
@@ -78,9 +78,14 @@ class RequestQueue(Base):
         idx, n_idx = self.discover()
         queues_id = self.server.get(self.queues_id_key)
         my_queues = self.get_my_queues(idx, n_idx, queues_id)
-        if my_queues:
+        while my_queues:
             # TODO: select based on priority and available slots
-            return random.choice(my_queues)
+            queue = random.choice(my_queues)
+            if self.server.zcard(queue):
+                return queue
+            else:
+                my_queues.remove(queue)
+                self.remove_empty_queue(queue)
 
     @lru_cache(maxsize=1)
     def get_my_queues(self, idx, n_idx, queues_id):
@@ -137,10 +142,13 @@ class RequestQueue(Base):
             return self._decode_request(results[0])
         else:
             # queue was empty: remove it from queues set
-            removed = self.server.srem(self.queues_key, queue_key)
-            if removed:
-                logger.debug('Removed empty queue {}'.format(queue_key))
-                self.server.incr(self.queues_id_key)
+            self.remove_empty_queue(queue_key)
+
+    def remove_empty_queue(self, queue_key):
+        removed = self.server.srem(self.queues_key, queue_key)
+        if removed:
+            logger.info('REM queue {}'.format(queue_key))
+            self.server.incr(self.queues_id_key)
 
     def request_queue_key(self, request):
         """ Key for request queue (based on it's domain).
