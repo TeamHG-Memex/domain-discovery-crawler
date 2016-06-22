@@ -26,6 +26,8 @@ class RequestQueue(Base):
         self.worker_id = self.server.incr(self.worker_id_key)
         self.alive_timeout = 10  # seconds
         self.im_alive()
+        self.n_pops = 0
+        self.stat_each = 1000 # requests
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -40,6 +42,10 @@ class RequestQueue(Base):
         self.server.sadd(self.queues_key, queue_key)
 
     def pop(self, timeout=0):
+        self.n_pops += 1
+        if self.n_pops % self.stat_each == 0:
+            logger.info('Queue size: {}, domains: {}'.format(
+                len(self), self.server.scard(self.queues_key)))
         queue_key = self.select_queue_key()
         if queue_key:
             return self.pop_from_queue(queue_key)
