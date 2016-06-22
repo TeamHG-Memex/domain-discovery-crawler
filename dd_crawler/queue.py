@@ -3,7 +3,6 @@ from urllib.parse import urlsplit
 from zlib import crc32
 from typing import Tuple
 import logging
-import time
 from functools import lru_cache
 
 import scrapy
@@ -46,6 +45,7 @@ class RequestQueue(Base):
             self.server.incr(self.len_key)
         queue_added = self.server.sadd(self.queues_key, queue_key)
         if queue_added:
+            logger.debug('Added new queue {}'.format(queue_key))
             self.server.incr(self.queues_id_key)
 
     def pop(self, timeout=0):
@@ -137,8 +137,10 @@ class RequestQueue(Base):
             return self._decode_request(results[0])
         else:
             # queue was empty: remove it from queues set
-            self.server.srem(self.queues_key, queue_key)
-            self.server.incr(self.queues_id_key)
+            removed = self.server.srem(self.queues_key, queue_key)
+            if removed:
+                logger.debug('Removed empty queue {}'.format(queue_key))
+                self.server.incr(self.queues_id_key)
 
     def request_queue_key(self, request):
         """ Key for request queue (based on it's domain).

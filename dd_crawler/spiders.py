@@ -34,7 +34,7 @@ class GeneralSpider(Spider):
 
         domain = _get_domain(response.request.url)
         for link in self.le.extract_links(response):
-            different_domain = _get_domain(link.url) == domain
+            different_domain = _get_domain(link.url) != domain
             if not (self.domain_limit and different_domain):
                 with _reset_depth_if(
                         self.reset_depth and different_domain, response):
