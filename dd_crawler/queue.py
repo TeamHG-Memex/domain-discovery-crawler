@@ -25,6 +25,7 @@ class RequestQueue(Base):
         super().__init__(*args, **kwargs)
         self.len_key = '{}:len'.format(self.key)
         self.queues_key = '{}:queues'.format(self.key)
+        self.queues_id_key = '{}:queues-id'.format(self.key)
         self.workers_key = '{}:workers'.format(self.key)
         self.worker_id_key = '{}:worker-id'.format(self.key)
         self.worker_id = self.server.incr(self.worker_id_key)
@@ -32,7 +33,6 @@ class RequestQueue(Base):
         self.im_alive()
         self.n_pops = 0
         self.stat_each = 1000 # requests
-        self.queue_cache_time = 3  # seconds
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -44,7 +44,9 @@ class RequestQueue(Base):
         added = self.server.zadd(queue_key, **pairs)
         if added:
             self.server.incr(self.len_key)
-        self.server.sadd(self.queues_key, queue_key)
+        queue_added = self.server.sadd(self.queues_key, queue_key)
+        if queue_added:
+            self.server.incr(self.queues_id_key)
 
     def pop(self, timeout=0):
         self.n_pops += 1
@@ -56,8 +58,8 @@ class RequestQueue(Base):
             return self.pop_from_queue(queue_key)
 
     def clear(self):
-        keys = {
-            self.len_key, self.queues_key, self.workers_key, self.worker_id_key}
+        keys = {self.len_key, self.queues_key, self.queues_id_key,
+                self.workers_key, self.worker_id_key}
         keys.update(self.get_workers())
         keys.update(self.get_queues())
         self.server.delete(*keys)
@@ -65,14 +67,6 @@ class RequestQueue(Base):
 
     def get_queues(self):
         return self.server.smembers(self.queues_key)
-
-    def get_queues_cached(self):
-        cache_key = int(time.time() / self.queue_cache_time)
-        return self._get_queues_cached(cache_key)
-
-    @lru_cache(maxsize=1)
-    def _get_queues_cached(self, _):
-        return self.get_queues()
 
     def get_workers(self):
         return self.server.smembers(self.workers_key)
@@ -82,12 +76,22 @@ class RequestQueue(Base):
         """ Select which queue (domain) to use next.
         """
         idx, n_idx = self.discover()
+        queues_id = self.server.get(self.queues_id_key)
+        my_queues = self.get_my_queues(idx, n_idx, queues_id)
+        if my_queues:
+            # TODO: select based on priority and available slots
+            return random.choice(my_queues)
+
+    @lru_cache(maxsize=1)
+    def get_my_queues(self, idx, n_idx, queues_id):
+        """ Get queues belonging to this worker.
+        """
+        # Here we cache not only expensive redis call, but a list comprehension
+        # below too.
+        # queues_id key ensures we discard cache when new queues are added.
         queues = self.get_queues()
         if queues:
-            my_queues = [q for q in queues if crc32(q) % n_idx == idx]
-            if my_queues:
-                # TODO: select based on priority and available slots
-                return random.choice(my_queues)
+            return [q for q in queues if crc32(q) % n_idx == idx]
 
     def discover(self) -> Tuple[int, int]:
         """ Return a tuple of (my index, total number of workers).
@@ -134,6 +138,7 @@ class RequestQueue(Base):
         else:
             # queue was empty: remove it from queues set
             self.server.srem(self.queues_key, queue_key)
+            self.server.incr(self.queues_id_key)
 
     def request_queue_key(self, request):
         """ Key for request queue (based on it's domain).
@@ -144,7 +149,7 @@ class RequestQueue(Base):
     def get_stats(self):
         """ Return all queue stats.
         """
-        queues = self.server.smembers(self.queues_key)
+        queues = self.get_queues()
         return dict(
             len=len(self),
             n_domains=len(queues),
