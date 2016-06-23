@@ -4,6 +4,7 @@ from zlib import crc32
 from typing import Optional, List, Tuple
 import logging
 from functools import lru_cache
+import time
 
 from scrapy import Request
 from scrapy_redis.queue import Base
@@ -22,12 +23,15 @@ logger = logging.getLogger(__name__)
 class RequestQueue(Base):
     """ Request queue where each domain has a separate queue,
     and each domain is crawled only by one worker to be polite.
+
+    QUEUE_CACHE_TIME setting determines the time queues are cached for,
+    when workers do not change (stale cache only leads to missing new domains
+    for a while, so it's safe to set it to higher values).
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.len_key = '{}:len'.format(self.key)
         self.queues_key = '{}:queues'.format(self.key)
-        self.queues_id_key = '{}:queues-id'.format(self.key)
         self.workers_key = '{}:workers'.format(self.key)
         self.worker_id_key = '{}:worker-id'.format(self.key)
         self.worker_id = self.server.incr(self.worker_id_key)
@@ -35,6 +39,8 @@ class RequestQueue(Base):
         self.im_alive()
         self.n_requests = 0
         self.stat_each = 1000  # requests
+        self.queue_cache_time = \
+            self.spider.settings.getint('QUEUE_CACHE_TIME', 1)  # seconds
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -48,8 +54,7 @@ class RequestQueue(Base):
             self.server.incr(self.len_key)
         queue_added = self.server.sadd(self.queues_key, queue_key)
         if queue_added:
-            logger.info('ADD queue {}'.format(queue_key))
-            self.server.incr(self.queues_id_key)
+            logger.debug('ADD queue {}'.format(queue_key))
 
     def pop(self, timeout=0) -> Request:
         self.n_requests += 1
@@ -61,8 +66,8 @@ class RequestQueue(Base):
             return self.pop_from_queue(queue_key)
 
     def clear(self):
-        keys = {self.len_key, self.queues_key, self.queues_id_key,
-                self.workers_key, self.worker_id_key}
+        keys = {
+            self.len_key, self.queues_key, self.workers_key, self.worker_id_key}
         keys.update(self.get_workers())
         keys.update(self.get_queues())
         self.server.delete(*keys)
@@ -79,8 +84,8 @@ class RequestQueue(Base):
         """ Select which queue (domain) to use next.
         """
         idx, n_idx = self.discover()
-        queues_id = self.server.get(self.queues_id_key)
-        my_queues = self.get_my_queues(idx, n_idx, queues_id)
+        time_step = int(time.time() / self.queue_cache_time)
+        my_queues = self.get_my_queues(idx, n_idx, time_step)
         while my_queues:
             # TODO: select based on priority and available slots
             queue = random.choice(my_queues)
@@ -91,15 +96,16 @@ class RequestQueue(Base):
                 self.remove_empty_queue(queue)
 
     @lru_cache(maxsize=1)
-    def get_my_queues(self, idx, n_idx, queues_id) -> List[bytes]:
+    def get_my_queues(self, idx: int, n_idx: int, time_step: int)\
+            -> List[bytes]:
         """ Get queues belonging to this worker.
+        Here we cache not only expensive redis call, but a list comprehension
+        below too.
+        time_step key makes the cache live self.queue_cache_time seconds.
+        Stale cache means we are not seeing new domains, nothing more.
         """
-        # Here we cache not only expensive redis call, but a list comprehension
-        # below too.
-        # queues_id key ensures we discard cache when new queues are added.
         queues = self.get_queues()
-        if queues:
-            return [q for q in queues if crc32(q) % n_idx == idx]
+        return [q for q in queues if crc32(q) % n_idx == idx]
 
     def discover(self) -> Tuple[int, int]:
         """ Return a tuple of (my index, total number of workers).
@@ -154,8 +160,7 @@ class RequestQueue(Base):
     def remove_empty_queue(self, queue_key: bytes) -> None:
         removed = self.server.srem(self.queues_key, queue_key)
         if removed:
-            logger.info('REM queue {}'.format(queue_key))
-            self.server.incr(self.queues_id_key)
+            logger.debug('REM queue {}'.format(queue_key))
 
     def request_queue_key(self, request: Request) -> str:
         """ Key for request queue (based on it's domain).
