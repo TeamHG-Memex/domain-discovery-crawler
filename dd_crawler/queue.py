@@ -1,11 +1,11 @@
 import random
 from urllib.parse import urlsplit
 from zlib import crc32
-from typing import Tuple
+from typing import Optional, List, Tuple
 import logging
 from functools import lru_cache
 
-import scrapy
+from scrapy import Request
 from scrapy_redis.queue import Base
 
 from .utils import warn_if_slower
@@ -16,10 +16,13 @@ logger = logging.getLogger(__name__)
 
 # Note about race conditions: there are several workers executing this code, but
 # - Redis itself is single-threaded
-# - only one worker should be crawling given domain
+# - Only one worker should be crawling given domain, unless workers enter/leave
 
 
 class RequestQueue(Base):
+    """ Request queue where each domain has a separate queue,
+    and each domain is crawled only by one worker to be polite.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.len_key = '{}:len'.format(self.key)
@@ -30,13 +33,13 @@ class RequestQueue(Base):
         self.worker_id = self.server.incr(self.worker_id_key)
         self.alive_timeout = 10  # seconds
         self.im_alive()
-        self.n_pops = 0
-        self.stat_each = 1000 # requests
+        self.n_requests = 0
+        self.stat_each = 1000  # requests
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
 
-    def push(self, request):
+    def push(self, request: Request):
         data = self._encode_request(request)
         pairs = {data: -request.priority}
         queue_key = self.request_queue_key(request)
@@ -48,9 +51,9 @@ class RequestQueue(Base):
             logger.info('ADD queue {}'.format(queue_key))
             self.server.incr(self.queues_id_key)
 
-    def pop(self, timeout=0):
-        self.n_pops += 1
-        if self.n_pops % self.stat_each == 0:
+    def pop(self, timeout=0) -> Request:
+        self.n_requests += 1
+        if self.n_requests % self.stat_each == 0:
             logger.info('Queue size: {}, domains: {}'.format(
                 len(self), self.server.scard(self.queues_key)))
         queue_key = self.select_queue_key()
@@ -65,14 +68,14 @@ class RequestQueue(Base):
         self.server.delete(*keys)
         super().clear()
 
-    def get_queues(self):
+    def get_queues(self) -> List[bytes]:
         return self.server.smembers(self.queues_key)
 
-    def get_workers(self):
+    def get_workers(self) -> List[bytes]:
         return self.server.smembers(self.workers_key)
 
     @warn_if_slower(0.1, logger)
-    def select_queue_key(self):
+    def select_queue_key(self) -> Optional[bytes]:
         """ Select which queue (domain) to use next.
         """
         idx, n_idx = self.discover()
@@ -88,7 +91,7 @@ class RequestQueue(Base):
                 self.remove_empty_queue(queue)
 
     @lru_cache(maxsize=1)
-    def get_my_queues(self, idx, n_idx, queues_id):
+    def get_my_queues(self, idx, n_idx, queues_id) -> List[bytes]:
         """ Get queues belonging to this worker.
         """
         # Here we cache not only expensive redis call, but a list comprehension
@@ -118,19 +121,23 @@ class RequestQueue(Base):
             return 0, 1
 
     def im_alive(self):
+        """ Tell the server that current worker is alive.
+        """
         pipe = self.server.pipeline()
         pipe.multi()
         pipe.sadd(self.workers_key, self.worker_id)\
             .set(self._worker_key(self.worker_id), 'ok', ex=self.alive_timeout)\
             .execute()
 
-    def is_alive(self, worker_id):
+    def is_alive(self, worker_id) -> bool:
+        """ Return whether given worker is alive.
+        """
         return bool(self.server.get(self._worker_key(worker_id)))
 
-    def _worker_key(self, worker_id):
+    def _worker_key(self, worker_id) -> str:
         return '{}:worker-{}'.format(self.key, worker_id)
 
-    def pop_from_queue(self, queue_key):
+    def pop_from_queue(self, queue_key: bytes) -> Request:
         """ Pop value with highest priority from the given queue.
         """
         pipe = self.server.pipeline()
@@ -144,13 +151,13 @@ class RequestQueue(Base):
             # queue was empty: remove it from queues set
             self.remove_empty_queue(queue_key)
 
-    def remove_empty_queue(self, queue_key):
+    def remove_empty_queue(self, queue_key: bytes) -> None:
         removed = self.server.srem(self.queues_key, queue_key)
         if removed:
             logger.info('REM queue {}'.format(queue_key))
             self.server.incr(self.queues_id_key)
 
-    def request_queue_key(self, request):
+    def request_queue_key(self, request: Request) -> str:
         """ Key for request queue (based on it's domain).
         """
         domain = urlsplit(request.url).netloc
@@ -171,14 +178,13 @@ class CompactRequestQueue(RequestQueue):
     """ Queue with a more compact request representation:
     in our case, we need to preserve only url and priority.
     """
-
-    def _encode_request(self, request):
+    def _encode_request(self, request: Request) -> str:
         return '{} {} {}'.format(
             int(request.priority),
             request.meta.get('depth', 0),
             request.url)
 
-    def _decode_request(self, encoded_request):
+    def _decode_request(self, encoded_request: bytes) -> Request:
         priority, depth, url = encoded_request.decode('utf-8').split(' ', 2)
-        return scrapy.Request(
+        return Request(
             url, priority=int(priority), meta={'depth': int(depth)})
