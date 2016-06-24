@@ -6,4 +6,4 @@ set -e
 dnsmasq
 
 # Crawl
-scrapy crawl dd_crawler $*
+scrapy crawl dd_crawler -s REDIS_HOST=redis $*

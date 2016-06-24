@@ -27,9 +27,11 @@ Settings:
 - ``QUEUE_CACHE_TIME`` (1 second by default) - time to cache the queues for.
  Set to higher values with more domains.
 
+For redis connection settings, refer to scrapy-redis docs.
 
-Using docker (does not work currently)
---------------------------------------
+
+Using docker
+------------
 
 Build dd-crawler image::
 
