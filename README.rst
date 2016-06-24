@@ -43,3 +43,13 @@ Start everything (this will take seeds from local ``seeds.txt``)::
 
 Crawled items will be written in CDR format to the local ``./out`` folder,
 one ``items_[0-n].jl`` file for each spider worker.
+
+
+Docker system setup
+-------------------
+
+Apart from installing docker, you might want to tell it to store data in
+a different location: redis persists queue to disk, and it can be quite big.
+To do so on Ubuntu, edit ``/etc/default/docker``, setting the path to
+desired storage directory via ``-g`` option, e.g.
+``DOCKER_OPTS="-g /data/docker"``, and restart docker daemon.
