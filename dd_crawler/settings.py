@@ -25,7 +25,11 @@ DEPTH_PRIORITY = 1
 
 DOWNLOADER_MIDDLEWARES = {
     'scrapy.downloadermiddlewares.redirect.RedirectMiddleware': None,
-    'dd_crawler.middleware.redirect.ForbidOffsiteRedirectsMiddleware': 600,
+    'dd_crawler.middleware.domains.ForbidOffsiteRedirectsMiddleware': 600,
+}
+
+SPIDER_MIDDLEWARES = {
+    'dd_crawler.middleware.domains.DomainControlMiddleware': 550,
 }
 
 HTTPCACHE_ENABLED = False
