@@ -1,4 +1,6 @@
+import re
 import time
+from urllib.parse import urlsplit
 
 
 def warn_if_slower(limit, logger):
@@ -14,3 +16,8 @@ def warn_if_slower(limit, logger):
                         fn.__name__, took))
         return inner
     return deco
+
+
+def get_domain(url):
+    domain = urlsplit(url).netloc
+    return re.sub(r'^www\.', '', domain)

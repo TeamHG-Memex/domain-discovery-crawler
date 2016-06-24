@@ -1,11 +1,11 @@
-import re
 from contextlib import contextmanager
-from urllib.parse import urlsplit
 
 from scrapy import Spider, Request
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
+
+from .utils import get_domain
 
 
 class GeneralSpider(Spider):
@@ -30,9 +30,9 @@ class GeneralSpider(Spider):
 
         domain_limit = self.settings.getbool('DOMAIN_LIMIT')
         reset_depth = self.settings.getbool('RESET_DEPTH')
-        domain = _get_domain(response.request.url)
+        domain = get_domain(response.request.url)
         for link in self.le.extract_links(response):
-            different_domain = _get_domain(link.url) != domain
+            different_domain = get_domain(link.url) != domain
             if not (domain_limit and different_domain):
                 with _reset_depth_if(
                         reset_depth and different_domain, response):
@@ -43,11 +43,6 @@ class GeneralSpider(Spider):
             crawler_name=self.settings.get('CDR_CRAWLER'),
             team_name=self.settings.get('CDR_TEAM'),
         )
-
-
-def _get_domain(url):
-    domain = urlsplit(url).netloc
-    return re.sub(r'^www\.', '', domain)
 
 
 @contextmanager

@@ -23,6 +23,11 @@ RESET_DEPTH = False
 
 DEPTH_PRIORITY = 1
 
+DOWNLOADER_MIDDLEWARES = {
+    'scrapy.downloadermiddlewares.redirect.RedirectMiddleware': None,
+    'dd_crawler.middleware.redirect.ForbidOffsiteRedirectsMiddleware': 600,
+}
+
 HTTPCACHE_ENABLED = False
 REDIRECT_ENABLED = True
 COOKIES_ENABLED = True
