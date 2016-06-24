@@ -16,6 +16,8 @@ SCHEDULER_PERSIST = True
 # SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.RequestQueue'
 SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.CompactRequestQueue'
 
+COMMANDS_MODULE = 'dd_crawler.commands'
+
 DOMAIN_LIMIT = True
 RESET_DEPTH = False
 

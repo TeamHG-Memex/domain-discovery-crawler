@@ -13,6 +13,9 @@ You also need to have ``redis-server`` running
 (you might want to tweak persistence options to make it less frequent or turn
 it off completely).
 
+Usage
+-----
+
 Start crawl with some seeds::
 
     scrapy crawl dd_crawler -s SEEDS=seeds.txt
@@ -28,6 +31,11 @@ Settings:
  Set to higher values with more domains.
 
 For redis connection settings, refer to scrapy-redis docs.
+
+To get a summary of queue stats and export full stats to json,
+run (passing extra settings as needed)::
+
+    scrapy queue_stats dd_crawler -o stats.json
 
 
 Using docker

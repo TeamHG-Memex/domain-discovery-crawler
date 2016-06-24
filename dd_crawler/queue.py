@@ -175,7 +175,8 @@ class RequestQueue(Base):
         return dict(
             len=len(self),
             n_domains=len(queues),
-            queues={name: self.server.zcard(name) for name in queues},
+            queues={name.decode('utf8'): self.server.zcard(name)
+                    for name in queues},
         )
 
 
