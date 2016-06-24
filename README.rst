@@ -45,8 +45,26 @@ Crawled items will be written in CDR format to the local ``./out`` folder,
 one ``items_[0-n].jl`` file for each spider worker.
 
 
-Docker system setup
--------------------
+Docker system setup on Ubuntu 14.04
+-----------------------------------
+
+Install docker engine::
+
+    sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 \
+                     --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+    echo "deb https://apt.dockerproject.org/repo ubuntu-trusty main" \
+      | sudo tee /etc/apt/sources.list.d/docker.list
+    sudo apt-get update
+    sudo apt-get install docker-engine
+
+Add yourself to the docker group (optional, requires re-login)::
+
+    sudo usermod -aG docker <yourname>
+
+Install docker-compose::
+
+    sudo apt-get install python-pip
+    sudo -H pip install docker-compose
 
 Apart from installing docker, you might want to tell it to store data in
 a different location: redis persists queue to disk, and it can be quite big.
