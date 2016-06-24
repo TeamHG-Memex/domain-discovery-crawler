@@ -3,7 +3,7 @@ FROM python:3.5
 WORKDIR /dd_crawler
 
 RUN apt-get update && \
-    apt-get install -y dnsmasq netcat
+    apt-get install -y dnsmasq redis-tools
 
 COPY ./requirements.txt .
 
