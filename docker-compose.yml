@@ -11,6 +11,8 @@ services:
     image: redis:3.0
     volumes:
       - redis-data:/data
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [redis-server, /usr/local/etc/redis/redis.conf]
 
   spider-0:
     image: dd-crawler
