@@ -35,4 +35,7 @@ class GeneralSpider(Spider):
             response,
             crawler_name=self.settings.get('CDR_CRAWLER'),
             team_name=self.settings.get('CDR_TEAM'),
+            metadata={
+                'depth': response.meta.get('depth'),
+            },
         )
