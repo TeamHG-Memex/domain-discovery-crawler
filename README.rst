@@ -57,6 +57,10 @@ Crawled items will be written in CDR format to the local ``./out`` folder,
 one ``${hostname}_items.jl`` file for each crawler worker, and logs will
 be written to ``${hostname}.log`` files.
 
+You can get queue with ``./docker/queue_stats.py``
+(or ``./docker/queue_stats.py  -o /out/stats.json`` if you want detailed output
+into local ``./out`` folder).
+
 
 Docker system setup on Ubuntu 14.04
 -----------------------------------
