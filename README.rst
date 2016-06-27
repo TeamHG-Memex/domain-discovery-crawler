@@ -49,8 +49,12 @@ Start everything (this will take seeds from local ``seeds.txt``)::
 
     docker-compose up
 
+After that, you can set desired number of crawler workers (4 in this example) with::
+
+    docker-compose scale crawler=4
+
 Crawled items will be written in CDR format to the local ``./out`` folder,
-one ``items_[0-n].jl`` file for each spider worker.
+one ``items_${hostname}.jl`` file for each crawler worker.
 
 
 Docker system setup on Ubuntu 14.04

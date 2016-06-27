@@ -14,45 +14,12 @@ services:
       - ./docker/redis.conf:/usr/local/etc/redis/redis.conf
     command: [redis-server, /usr/local/etc/redis/redis.conf]
 
-  spider-0:
+  crawler:
     image: dd-crawler
     volumes:
       - ./seeds.txt:/dd_crawler/seeds.txt
       - ./out:/out
-    entrypoint: /dd_crawler/docker/crawl.sh -o /out/items_0.jl -s SEEDS=/dd_crawler/seeds.txt
-    dns:
-      - 127.0.0.1
-    links:
-      - redis
-
-  spider-1:
-    image: dd-crawler
-    volumes:
-      - ./seeds.txt:/dd_crawler/seeds.txt
-      - ./out:/out
-    entrypoint: /dd_crawler/docker/crawl.sh -o /out/items_1.jl
-    dns:
-      - 127.0.0.1
-    links:
-      - redis
-
-  spider-2:
-    image: dd-crawler
-    volumes:
-      - ./seeds.txt:/dd_crawler/seeds.txt
-      - ./out:/out
-    entrypoint: /dd_crawler/docker/crawl.sh -o /out/items_2.jl
-    dns:
-      - 127.0.0.1
-    links:
-      - redis
-
-  spider-3:
-    image: dd-crawler
-    volumes:
-      - ./seeds.txt:/dd_crawler/seeds.txt
-      - ./out:/out
-    entrypoint: /dd_crawler/docker/crawl.sh -o /out/items_3.jl
+    entrypoint: /dd_crawler/docker/crawl.sh -s SEEDS=/dd_crawler/seeds.txt
     dns:
       - 127.0.0.1
     links:
