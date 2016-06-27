@@ -54,7 +54,8 @@ After that, you can set desired number of crawler workers (4 in this example) wi
     docker-compose scale crawler=4
 
 Crawled items will be written in CDR format to the local ``./out`` folder,
-one ``items_${hostname}.jl`` file for each crawler worker.
+one ``${hostname}_items.jl`` file for each crawler worker, and logs will
+be written to ``${hostname}.log`` files.
 
 
 Docker system setup on Ubuntu 14.04
