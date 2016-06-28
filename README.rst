@@ -18,7 +18,7 @@ Usage
 
 Start crawl with some seeds::
 
-    scrapy crawl dd_crawler -s SEEDS=seeds.txt
+    scrapy crawl dd_crawler -a seeds=seeds.txt
 
 Start other workers without specifying seeds.
 
@@ -42,13 +42,18 @@ run (passing extra settings as needed)::
 Using docker
 ------------
 
+Note: currently you need to first build a ``deep-deep`` package with
+``python setup.py sdist``, and copy resulting ``deep-deep-0.0.tar.gz`` into
+this package root.
+
 Build dd-crawler image::
 
     docker build -t dd-crawler .
 
-Start everything (this will take seeds from local ``seeds.txt``)::
+Start everything (this will take seeds from local ``./seeds.txt``, and
+deep-deep model from ``./Q.joblib``)::
 
-    docker-compose up
+    docker-compose up -d
 
 After that, you can set desired number of crawler workers (4 in this example) with::
 

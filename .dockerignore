@@ -4,6 +4,7 @@
 !logging.conf
 !dd_crawler
 !docker
+!deep-deep-*.tar.gz
 !scrapy.cfg
 **/__pycache__
 **/*.pyc

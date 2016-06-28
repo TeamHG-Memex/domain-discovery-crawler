@@ -18,8 +18,10 @@ services:
     image: dd-crawler
     volumes:
       - ./seeds.txt:/dd_crawler/seeds.txt
+      - ./Q.joblib:/dd_crawler/Q.joblib
       - ./out:/out
-    entrypoint: /dd_crawler/docker/crawl.sh -s SEEDS=/dd_crawler/seeds.txt
+   #entrypoint: /dd_crawler/docker/crawl.sh dd_crawler -a seeds=/dd_crawler/seeds.txt
+    entrypoint: /dd_crawler/docker/crawl.sh deepdeep -a seeds=/dd_crawler/seeds.txt -a clf=/dd_crawler/Q.joblib
     dns:
       - 127.0.0.1
     links:
