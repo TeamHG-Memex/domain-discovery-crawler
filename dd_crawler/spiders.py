@@ -1,11 +1,7 @@
-from contextlib import contextmanager
-
 from scrapy import Spider, Request
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
-
-from .utils import get_domain
 
 
 class GeneralSpider(Spider):
