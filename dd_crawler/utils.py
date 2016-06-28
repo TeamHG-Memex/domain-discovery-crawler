@@ -1,3 +1,4 @@
+import contextlib
 import re
 import time
 from urllib.parse import urlsplit
@@ -21,3 +22,13 @@ def warn_if_slower(limit, logger):
 def get_domain(url):
     domain = urlsplit(url).netloc
     return re.sub(r'^www\.', '', domain)
+
+
+@contextlib.contextmanager
+def dont_increase_depth(response):
+    # XXX: a hack to keep the same depth for outgoing requests
+    response.meta['depth'] -= 1
+    try:
+        yield
+    finally:
+        response.meta['depth'] += 1

@@ -8,5 +8,6 @@ setup(
         'scrapy>=1.1.0',
         'scrapy-cdr',
         'scrapy-redis',
+        'autopager',
     ],
 )

@@ -1,7 +1,10 @@
+import autopager
 from scrapy import Spider, Request
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
+
+from .utils import dont_increase_depth
 
 
 class GeneralSpider(Spider):
@@ -23,6 +26,11 @@ class GeneralSpider(Spider):
     def parse(self, response):
         if not isinstance(response, HtmlResponse):
             return
+
+        if self.settings.getbool('AUTOPAGER'):
+            for url in autopager.urls(response):
+                with dont_increase_depth(response):
+                    yield Request(url=url)
 
         for link in self.le.extract_links(response):
             yield Request(url=link.url)
