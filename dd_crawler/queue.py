@@ -87,13 +87,23 @@ class RequestQueue(Base):
         time_step = int(time.time() / self.queue_cache_time)
         my_queues = self.get_my_queues(idx, n_idx, time_step)
         while my_queues:
-            # TODO: select based on priority and available slots
-            queue = random.choice(my_queues)
+            queue = self.select_best_queue(my_queues)
             if self.server.zcard(queue):
                 return queue
             else:
                 my_queues.remove(queue)
                 self.remove_empty_queue(queue)
+
+    def select_best_queue(self, queues: List[bytes]) -> bytes:
+        """ Select best queue to crawl from, taking free slots into account.
+        """
+        available_queues = []
+        slots = self.spider.crawler.engine.downloader.slots
+        for q in queues:
+            domain = self.queue_key_domain(q)
+            if domain not in slots or slots[domain].free_transfer_slots():
+                available_queues.append(q)
+        return random.choice(available_queues or queues)
 
     @lru_cache(maxsize=1)
     def get_my_queues(self, idx: int, n_idx: int, time_step: int)\
@@ -167,6 +177,12 @@ class RequestQueue(Base):
         """
         domain = urlsplit(request.url).netloc
         return '{}:domain:{}'.format(self.key, domain)
+
+    def queue_key_domain(self, queue_key: bytes) -> str:
+        queue_key = queue_key.decode('utf8')
+        prefix = '{}:domain:'.format(self.key)
+        assert queue_key.startswith(prefix)
+        return queue_key[len(prefix):]
 
     def get_stats(self):
         """ Return all queue stats.
