@@ -14,7 +14,7 @@ def main():
     try:
         print(check_output(
             'docker exec -it {} '
-            'scrapy queue_stats dd_crawler -s REDIS_HOST=redis {}'
+            'scrapy queue_stats deepdeep -s REDIS_HOST=redis {}'
             .format(image_name, ' '.join(sys.argv[1:])),
             shell=True).decode('utf8'))
     except CalledProcessError as e:
