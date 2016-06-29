@@ -4,7 +4,6 @@ from scrapy.commands import ScrapyCommand
 from scrapy.exceptions import UsageError
 
 from scrapy_redis.scheduler import Scheduler
-from dd_crawler.queue import RequestQueue
 
 
 class Command(ScrapyCommand):
