@@ -221,24 +221,10 @@ class BaseRequestQueue(Base):
         )
 
 
-BALANCING_TEMPERATURE = 0.1
-FLOAT_PRIORITY_MULTIPLIER = 10000
-TEMPERATURE = FLOAT_PRIORITY_MULTIPLIER * BALANCING_TEMPERATURE
-
-
-class RequestQueue(BaseRequestQueue):
-
-    def select_best_queue(self, queues: BaseRequestQueue.Queues) -> bytes:
-        """ Select queue taking weights into account.
-        """
-        available_queues = self.get_available_queues(queues) or queues
-        keys = list(available_queues)
-        weights = [-available_queues[q] for q in keys]
-        p = softmax(weights, t=TEMPERATURE)
-        return np.random.choice(keys, p=p)
-
-    # A more compact request representation:
-    # in our case, we need to preserve only url and priority.
+class CompactQueue(BaseRequestQueue):
+    """ A more compact request representation:
+    preserve only url, depth and priority.
+    """
 
     def _encode_request(self, request: Request) -> str:
         return '{} {} {}'.format(
@@ -250,3 +236,17 @@ class RequestQueue(BaseRequestQueue):
         priority, depth, url = encoded_request.decode('utf-8').split(' ', 2)
         return Request(
             url, priority=int(priority), meta={'depth': int(depth)})
+
+
+class SoftmaxQueue(CompactQueue):
+    def select_best_queue(self, queues: BaseRequestQueue.Queues) -> bytes:
+        """ Select queue taking weights into account.
+        """
+        temprature = (
+            self.spider.settings.getfloat('DD_BALANCING_TEMPERATURE') *
+            self.spider.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
+        available_queues = self.get_available_queues(queues) or queues
+        keys = list(available_queues)
+        weights = [-available_queues[q] for q in keys]
+        p = softmax(weights, t=temprature)
+        return np.random.choice(keys, p=p)

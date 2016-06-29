@@ -6,7 +6,7 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
 
 from .utils import dont_increase_depth
-from .queue import FLOAT_PRIORITY_MULTIPLIER
+from .queue import SoftmaxQueue
 
 
 class GeneralSpider(Spider):
@@ -46,7 +46,6 @@ class GeneralSpider(Spider):
 
 class DeepDeepSpider(GeneralSpider):
     name = 'deepdeep'
-    initial_priority = 10 * FLOAT_PRIORITY_MULTIPLIER
 
     def __init__(self, clf=None, **kwargs):
         if clf:  # can be empty if we juss want to get queue stats
@@ -54,13 +53,15 @@ class DeepDeepSpider(GeneralSpider):
         super().__init__(**kwargs)
 
     def start_requests(self):
+        initial_priority = 10 * self.settings.getfloat('DD_PRIORITY_MULTIPLIER')
         for request in super().start_requests():
-            request.priority = self.initial_priority
+            request.priority = initial_priority
             yield request
 
     def parse(self, response):
         urls = self.clf.extract_urls(response.text, response.url)
         for score, url in urls:
-            priority = int(score * FLOAT_PRIORITY_MULTIPLIER)
+            priority = int(
+                score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
             yield Request(url, priority=priority)
         yield self.page_item(response)
