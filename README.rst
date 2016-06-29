@@ -42,10 +42,6 @@ run (passing extra settings as needed)::
 Using docker
 ------------
 
-Note: currently you need to first build a ``deep-deep`` package with
-``python setup.py sdist``, and copy resulting ``deep-deep-0.0.tar.gz`` into
-this package root.
-
 Build dd-crawler image::
 
     docker build -t dd-crawler .
