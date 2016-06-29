@@ -48,8 +48,9 @@ class DeepDeepSpider(GeneralSpider):
     priority_multiplier = 10000
     initial_priority = 10 * priority_multiplier
 
-    def __init__(self, clf, **kwargs):
-        self.clf = LinkClassifier.load(clf)
+    def __init__(self, clf=None, **kwargs):
+        if clf:  # can be empty if we juss want to get queue stats
+            self.clf = LinkClassifier.load(clf)
         super().__init__(**kwargs)
 
     def start_requests(self):

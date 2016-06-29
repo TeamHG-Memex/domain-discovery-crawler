@@ -6,6 +6,7 @@ from scrapy.exceptions import UsageError
 from scrapy_redis.scheduler import Scheduler
 from dd_crawler.queue import RequestQueue
 
+
 class Command(ScrapyCommand):
     requires_project = True
 
@@ -31,18 +32,16 @@ class Command(ScrapyCommand):
         stats = scheduler.queue.get_stats()
 
         print('\nQueue size: {len}, domains: {n_domains}\n'.format(**stats))
-        printed = 0
-        queues = sorted(
-            stats['queues'].items(), key=lambda x: x[1], reverse=True)
-        fmt = '{:<50}\t{}'
-        for queue, count in queues[:10]:
-            printed += count
+        printed_count = 0
+        print('{:<50}\tCount\tScore'.format('Domain'))
+        for queue, score, count in stats['queues'][:10]:
+            printed_count += count
             domain = queue.rsplit(':')[-1]
-            print(fmt.format(domain, count))
-        other = sum(stats['queues'].values()) - printed
+            print('{:<50}\t{}\t{:.0f}'.format(domain, count, score))
+        other = sum(count for _, _, count in stats['queues']) - printed_count
         if other:
             print('...')
-            print(fmt.format('other:', other))
+            print('{:<50}\t{}'.format('other:', other))
             print()
 
         if opts.output:

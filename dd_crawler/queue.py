@@ -1,7 +1,7 @@
 import random
 from urllib.parse import urlsplit
 from zlib import crc32
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Union, Dict
 import logging
 from functools import lru_cache
 import time
@@ -30,10 +30,10 @@ class RequestQueue(Base):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.len_key = '{}:len'.format(self.key)
-        self.queues_key = '{}:queues'.format(self.key)
-        self.workers_key = '{}:workers'.format(self.key)
-        self.worker_id_key = '{}:worker-id'.format(self.key)
+        self.len_key = '{}:len'.format(self.key)  # redis int
+        self.queues_key = '{}:queues'.format(self.key)  # redis sorted set
+        self.workers_key = '{}:workers'.format(self.key)  # redis set
+        self.worker_id_key = '{}:worker-id'.format(self.key)  # redis int
         self.worker_id = self.server.incr(self.worker_id_key)
         self.alive_timeout = 10  # seconds
         self.im_alive()
@@ -47,12 +47,19 @@ class RequestQueue(Base):
 
     def push(self, request: Request):
         data = self._encode_request(request)
-        pairs = {data: -request.priority}
+        score = -request.priority
         queue_key = self.request_queue_key(request)
-        added = self.server.zadd(queue_key, **pairs)
+        added = self.server.zadd(queue_key, **{data: score})
         if added:
             self.server.incr(self.len_key)
-        queue_added = self.server.sadd(self.queues_key, queue_key)
+        top = self.server.zrange(queue_key, 0, 0, withscores=True)
+        if top:
+            (_, queue_score), = top
+        else:  # a race during domain re-balancing: do not care about score much
+            logger.warning('Placing a possibly incorrect queue score')
+            queue_score = score
+        queue_added = self.server.zadd(
+            self.queues_key, **{queue_key: queue_score})
         if queue_added:
             logger.debug('ADD queue {}'.format(queue_key))
 
@@ -60,7 +67,7 @@ class RequestQueue(Base):
         self.n_requests += 1
         if self.n_requests % self.stat_each == 0:
             logger.info('Queue size: {}, domains: {}'.format(
-                len(self), self.server.scard(self.queues_key)))
+                len(self), self.server.zcard(self.queues_key)))
         queue_key = self.select_queue_key()
         if queue_key:
             return self.pop_from_queue(queue_key)
@@ -73,8 +80,9 @@ class RequestQueue(Base):
         self.server.delete(*keys)
         super().clear()
 
-    def get_queues(self) -> List[bytes]:
-        return self.server.smembers(self.queues_key)
+    def get_queues(self, withscores=False) \
+            -> Union[List[bytes], List[Tuple[bytes, float]]]:
+        return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
 
     def get_workers(self) -> List[bytes]:
         return self.server.smembers(self.workers_key)
@@ -91,31 +99,36 @@ class RequestQueue(Base):
             if self.server.zcard(queue):
                 return queue
             else:
-                my_queues.remove(queue)
+                del my_queues[queue]
                 self.remove_empty_queue(queue)
 
-    def select_best_queue(self, queues: List[bytes]) -> bytes:
+    def select_best_queue(self, queues: Dict[bytes, float]) -> bytes:
         """ Select best queue to crawl from, taking free slots into account.
         """
-        available_queues = []
         slots = self.spider.crawler.engine.downloader.slots
-        for q in queues:
+        min_score = None
+        available_queues = []
+        for q, s in sorted(queues.items(), key=lambda x: x[1]):
+            if min_score is None:
+                min_score = s
+            if s > min_score and available_queues:
+                break
             domain = self.queue_key_domain(q)
             if domain not in slots or slots[domain].free_transfer_slots():
                 available_queues.append(q)
-        return random.choice(available_queues or queues)
+        return random.choice(available_queues or queues.keys())
 
     @lru_cache(maxsize=1)
     def get_my_queues(self, idx: int, n_idx: int, time_step: int)\
-            -> List[bytes]:
+            -> Dict[bytes, float]:
         """ Get queues belonging to this worker.
         Here we cache not only expensive redis call, but a list comprehension
         below too.
         time_step key makes the cache live self.queue_cache_time seconds.
         Stale cache means we are not seeing new domains, nothing more.
         """
-        queues = self.get_queues()
-        return [q for q in queues if crc32(q) % n_idx == idx]
+        queues = self.get_queues(withscores=True)
+        return {q: s for q, s in queues if crc32(q) % n_idx == idx}
 
     def discover(self) -> Tuple[int, int]:
         """ Return a tuple of (my index, total number of workers).
@@ -158,17 +171,25 @@ class RequestQueue(Base):
         """
         pipe = self.server.pipeline()
         pipe.multi()
-        pipe.zrange(queue_key, 0, 0).zremrangebyrank(queue_key, 0, 0)
+        pipe.zrange(queue_key, 0, 1, withscores=True)\
+            .zremrangebyrank(queue_key, 0, 0)
         results, count = pipe.execute()
         if results:
             self.server.decr(self.len_key)
-            return self._decode_request(results[0])
+            if len(results) == 2:
+                _, queue_score = results[1]
+                self.server.zadd(
+                    self.queues_key, **{queue_key.decode('utf8'): queue_score})
+            else:
+                self.remove_empty_queue(queue_key)
+            return self._decode_request(results[0][0])
         else:
             # queue was empty: remove it from queues set
             self.remove_empty_queue(queue_key)
 
     def remove_empty_queue(self, queue_key: bytes) -> None:
-        removed = self.server.srem(self.queues_key, queue_key)
+        # FIXME - maybe we should not remove empty queue keys? That can be racy
+        removed = self.server.zrem(self.queues_key, queue_key)
         if removed:
             logger.debug('REM queue {}'.format(queue_key))
 
@@ -187,12 +208,13 @@ class RequestQueue(Base):
     def get_stats(self):
         """ Return all queue stats.
         """
-        queues = self.get_queues()
+        queues = self.get_queues(withscores=True)
         return dict(
             len=len(self),
             n_domains=len(queues),
-            queues={name.decode('utf8'): self.server.zcard(name)
-                    for name in queues},
+            queues=[
+                (name.decode('utf8'), -score, self.server.zcard(name))
+                for name, score in queues],
         )
 
 
