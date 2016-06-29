@@ -10,5 +10,5 @@ while ! redis-cli -h redis get some-key-tocheck-if-redis-is-ready; do sleep 0.1;
 
 hostname=`hostname`
 
-echo 'Crawling'
+echo "Crawling (see logs at /out/${hostname}.log)"
 scrapy crawl -o /out/${hostname}_items.jl -s REDIS_HOST=redis -s LOG_FILE=/out/${hostname}.log $*
