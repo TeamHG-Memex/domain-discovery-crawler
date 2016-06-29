@@ -6,11 +6,12 @@ import logging
 from functools import lru_cache
 import time
 
+from deepdeep.utils import softmax
+import numpy as np
 from scrapy import Request
 from scrapy_redis.queue import Base
 
 from .utils import warn_if_slower
-
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 # - Only one worker should be crawling given domain, unless workers enter/leave
 
 
-class RequestQueue(Base):
+class BaseRequestQueue(Base):
     """ Request queue where each domain has a separate queue,
     and each domain is crawled only by one worker to be polite.
 
@@ -102,25 +103,27 @@ class RequestQueue(Base):
                 del my_queues[queue]
                 self.remove_empty_queue(queue)
 
-    def select_best_queue(self, queues: Dict[bytes, float]) -> bytes:
-        """ Select best queue to crawl from, taking free slots into account.
+    Queues = Dict[bytes, float]
+
+    def select_best_queue(self, queues: Queues) -> bytes:
+        """ Select queue to crawl from, taking free slots into account.
+        """
+        available_queues = self.get_available_queues(queues)
+        return random.choice(list(available_queues or queues))
+
+    def get_available_queues(self, queues: Queues) -> Queues:
+        """ Return all queues with free slots.
         """
         slots = self.spider.crawler.engine.downloader.slots
-        min_score = None
-        available_queues = []
-        for q, s in sorted(queues.items(), key=lambda x: x[1]):
-            if min_score is None:
-                min_score = s
-            if s > min_score and available_queues:
-                break
+        available_queues = {}
+        for q, s in queues.items():
             domain = self.queue_key_domain(q)
             if domain not in slots or slots[domain].free_transfer_slots():
-                available_queues.append(q)
-        return random.choice(available_queues or queues.keys())
+                available_queues[q] = s
+        return available_queues
 
     @lru_cache(maxsize=1)
-    def get_my_queues(self, idx: int, n_idx: int, time_step: int)\
-            -> Dict[bytes, float]:
+    def get_my_queues(self, idx: int, n_idx: int, time_step: int) -> Queues:
         """ Get queues belonging to this worker.
         Here we cache not only expensive redis call, but a list comprehension
         below too.
@@ -218,10 +221,27 @@ class RequestQueue(Base):
         )
 
 
-class CompactRequestQueue(RequestQueue):
-    """ Queue with a more compact request representation:
-    in our case, we need to preserve only url and priority.
-    """
+BALANCING_TEMPERATURE = 0.1
+FLOAT_PRIORITY_MULTIPLIER = 10000
+TEMPERATURE = FLOAT_PRIORITY_MULTIPLIER * BALANCING_TEMPERATURE
+
+
+class RequestQueue(BaseRequestQueue):
+
+    def select_best_queue(self, queues: BaseRequestQueue.Queues) -> bytes:
+        """ Select queue taking weights into account.
+        """
+        available_queues = self.get_available_queues(queues) or queues
+        keys = list(available_queues)
+        weights = [-available_queues[q] for q in keys]
+        p = softmax(weights, t=TEMPERATURE)
+        if len(available_queues) > 100:
+            import IPython; IPython.embed()
+        return np.random.choice(keys, p=p)
+
+    # A more compact request representation:
+    # in our case, we need to preserve only url and priority.
+
     def _encode_request(self, request: Request) -> str:
         return '{} {} {}'.format(
             int(request.priority),

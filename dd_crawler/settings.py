@@ -13,8 +13,7 @@ USER_AGENT = (
 SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 # Don't cleanup redis queues, allows to pause/resume crawls.
 SCHEDULER_PERSIST = True
-# SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.RequestQueue'
-SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.CompactRequestQueue'
+SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.RequestQueue'
 
 COMMANDS_MODULE = 'dd_crawler.commands'
 
