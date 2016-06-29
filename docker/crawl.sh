@@ -6,7 +6,10 @@ set -e
 dnsmasq
 
 echo 'Waiting for redis...'
-while ! redis-cli -h redis get some-key-tocheck-if-redis-is-ready; do sleep 0.1; done
+# First wait while it's up
+while ! redis-cli -h redis get some-key-to-check-if-redis-is-ready; do sleep 0.1; done
+# Next, it can be up but still loading, so we grep for "LOADING"
+while redis-cli -h redis get some-key-to-check-if-redis-is-ready | grep -q LOADING; do sleep 0.1; done
 
 hostname=`hostname`
 
