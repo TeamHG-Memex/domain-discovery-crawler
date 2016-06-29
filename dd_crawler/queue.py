@@ -235,8 +235,6 @@ class RequestQueue(BaseRequestQueue):
         keys = list(available_queues)
         weights = [-available_queues[q] for q in keys]
         p = softmax(weights, t=TEMPERATURE)
-        if len(available_queues) > 100:
-            import IPython; IPython.embed()
         return np.random.choice(keys, p=p)
 
     # A more compact request representation:
