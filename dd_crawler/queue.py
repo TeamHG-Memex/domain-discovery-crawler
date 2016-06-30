@@ -29,7 +29,7 @@ class BaseRequestQueue(Base):
     when workers do not change (stale cache only leads to missing new domains
     for a while, so it's safe to set it to higher values).
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, slots_mock=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.len_key = '{}:len'.format(self.key)  # redis int
         self.queues_key = '{}:queues'.format(self.key)  # redis sorted set
@@ -40,6 +40,7 @@ class BaseRequestQueue(Base):
         self.im_alive()
         self.n_requests = 0
         self.stat_each = 1000  # requests
+        self.slots_mock = slots_mock
         self.queue_cache_time = \
             self.spider.settings.getint('QUEUE_CACHE_TIME', 1)  # seconds
 
@@ -93,7 +94,9 @@ class BaseRequestQueue(Base):
         """ Select which queue (domain) to use next.
         """
         idx, n_idx = self.discover()
-        time_step = int(time.time() / self.queue_cache_time)
+        time_step = time.time()
+        if self.queue_cache_time:
+            time_step = int(time_step / self.queue_cache_time)
         my_queues = self.get_my_queues(idx, n_idx, time_step)
         while my_queues:
             queue = self.select_best_queue(my_queues)
@@ -114,7 +117,8 @@ class BaseRequestQueue(Base):
     def get_available_queues(self, queues: Queues) -> Queues:
         """ Return all queues with free slots.
         """
-        slots = self.spider.crawler.engine.downloader.slots
+        slots = (self.spider.crawler.engine.downloader.slots
+                 if self.slots_mock is None else self.slots_mock)
         available_queues = {}
         for q, s in queues.items():
             domain = self.queue_key_domain(q)
