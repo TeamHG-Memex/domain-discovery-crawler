@@ -289,12 +289,13 @@ class CompactQueue(BaseRequestQueue):
 
 
 class SoftmaxQueue(CompactQueue):
-    def select_best_queue(self, idx: int, n_idx: int) -> bytes:
+    def select_best_queue(self, idx: int, n_idx: int) -> Optional[bytes]:
         """ Select queue taking weights into account.
         """
-        temprature = (
-            self.spider.settings.getfloat('DD_BALANCING_TEMPERATURE') *
-            self.spider.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
         available_queues, scores = self.get_available_queues(idx, n_idx)
-        p = softmax(-scores, t=temprature)
-        return np.random.choice(available_queues, p=p)
+        if available_queues:
+            temprature = (
+                self.spider.settings.getfloat('DD_BALANCING_TEMPERATURE') *
+                self.spider.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
+            p = softmax(-scores, t=temprature)
+            return np.random.choice(available_queues, p=p)

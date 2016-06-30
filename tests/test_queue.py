@@ -1,11 +1,12 @@
 import os
 
+import pytest
 import redis
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy_redis.scheduler import QUEUE_KEY
 
-from dd_crawler.queue import BaseRequestQueue
+from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue
 
 
 # allow test settings from environment
@@ -17,7 +18,8 @@ class ATestSpider(Spider):
     name = 'test_dd_spider'
 
 
-def make_server():
+@pytest.fixture
+def server():
     redis_server = redis.from_url(REDIS_URL)
     keys = redis_server.keys(QUEUE_KEY % {'spider': ATestSpider.name} + '*')
     if keys:
@@ -25,7 +27,12 @@ def make_server():
     return redis_server
 
 
-def make_queue(redis_server, cls=BaseRequestQueue, slots=None, skip_cache=True):
+@pytest.fixture(params=[BaseRequestQueue, SoftmaxQueue, SoftmaxQueue])
+def queue_cls(request):
+    return request.param
+
+
+def make_queue(redis_server, cls, slots=None, skip_cache=True):
     crawler = Crawler(Spider)
     if slots is None:
         slots = {}
@@ -34,9 +41,8 @@ def make_queue(redis_server, cls=BaseRequestQueue, slots=None, skip_cache=True):
                slots_mock=slots, skip_cache=skip_cache)
 
 
-def test_push_pop():
-    server = make_server()
-    q = make_queue(server)
+def test_push_pop(server, queue_cls):
+    q = make_queue(server, queue_cls)
     assert q.pop() is None
     assert q.get_queues() == []
     r1 = Request('http://example.com', priority=100, meta={'depth': 10})
@@ -47,11 +53,11 @@ def test_push_pop():
     assert r1_.url == r1.url
     assert r1_.priority == r1.priority
     assert r1_.meta['depth'] == r1.meta['depth']
+    assert q.pop() is None
 
 
-def test_priority():
-    server = make_server()
-    q = make_queue(server)
+def test_priority(server, queue_cls):
+    q = make_queue(server, queue_cls)
     q.push(Request('http://example.com/1', priority=10))
     q.push(Request('http://example.com/2', priority=100))
     q.push(Request('http://example.com/3', priority=1))
@@ -61,10 +67,9 @@ def test_priority():
         'http://example.com/3']
 
 
-def test_domain_distribution():
-    server = make_server()
-    q1 = make_queue(server)
-    q2 = make_queue(server)
+def test_domain_distribution(server, queue_cls):
+    q1 = make_queue(server, queue_cls)
+    q2 = make_queue(server, queue_cls)
     for url in ['http://a.com', 'http://a.com/foo', 'http://b.com',
                 'http://b.com/foo', 'http://c.com']:
         q1.push(Request(url=url))  # queue does not matter
