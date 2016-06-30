@@ -31,16 +31,19 @@ class Command(ScrapyCommand):
         stats = scheduler.queue.get_stats()
 
         print('\nQueue size: {len}, domains: {n_domains}\n'.format(**stats))
+        print_top = 10
         printed_count = 0
+        queues = stats['queues']
         print('{:<50}\tCount\tScore'.format('Domain'))
-        for queue, score, count in stats['queues'][:10]:
+        for queue, score, count in queues[:print_top]:
             printed_count += count
             domain = queue.rsplit(':')[-1]
             print('{:<50}\t{}\t{:.0f}'.format(domain, count, score))
-        other = sum(count for _, _, count in stats['queues']) - printed_count
-        if other:
+        others_count = sum(count for _, _, count in queues) - printed_count
+        if others_count:
             print('...')
-            print('{:<50}\t{}'.format('other:', other))
+            print('{:<50}\t{}'.format(
+                'other {}:'.format(len(queues) - print_top), others_count))
             print()
 
         if opts.output:
