@@ -158,8 +158,7 @@ class BaseRequestQueue(Base):
         """ Return all queues with free slots (or just all) and their weights.
         """
         queues = self.get_my_queues(idx, n_idx)
-        slots = (self.spider.crawler.engine.downloader.slots
-                 if self.slots_mock is None else self.slots_mock)
+        slots = self.get_slots()
         available_queues, scores = [], []
         all_queues, all_scores = [], []
         for q, s in queues.items():
@@ -171,6 +170,14 @@ class BaseRequestQueue(Base):
                 scores.append(s)
         return ((available_queues, np.array(scores)) if available_queues else
                 (all_queues, np.array(all_scores)))
+
+    def get_slots(self) -> Dict:
+        return (self.spider.crawler.engine.downloader.slots
+                if self.slots_mock is None else self.slots_mock)
+
+    def has_free_slots(self, queue: bytes, slots: Dict) -> bool:
+        domain = self.queue_key_domain(queue)
+        return domain not in slots or slots[domain].free_transfer_slots()
 
     @cacheforawhile
     def get_my_queues(self, idx: int, n_idx: int) -> Queues:
@@ -298,4 +305,11 @@ class SoftmaxQueue(CompactQueue):
                 self.spider.settings.getfloat('DD_BALANCING_TEMPERATURE') *
                 self.spider.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
             p = softmax(-scores, t=temprature)
-            return np.random.choice(available_queues, p=p)
+            queue = np.random.choice(available_queues, p=p)
+            slots = self.get_slots()
+            if not self.has_free_slots(queue, slots):
+                # It's possible to sample more than one queue above and check
+                # which one has free slots. But for now log when we select a
+                # "bad" queue - it seems to be extremely rare in practice.
+                logger.info('Selected queue has no free slots')
+            return queue
