@@ -2,5 +2,6 @@ autopager
 numpy
 scrapy==1.1.0
 scrapy-cdr
+vmprof
 git+https://github.com/lopuhin/scrapy-redis.git@py3
 #git+https://github.com:/eamHG-Memex/deep-deep.git@dd-crawler-integration
