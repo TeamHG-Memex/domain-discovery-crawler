@@ -20,17 +20,18 @@ class ATestSpider(Spider):
 def make_server():
     redis_server = redis.from_url(REDIS_URL)
     keys = redis_server.keys(QUEUE_KEY % {'spider': ATestSpider.name} + '*')
-    redis_server.delete(*keys)
+    if keys:
+        redis_server.delete(*keys)
     return redis_server
 
 
-def make_queue(redis_server, cls=BaseRequestQueue, slots=None):
-    crawler = Crawler(Spider, settings={'QUEUE_CACHE_TIME': 0})
+def make_queue(redis_server, cls=BaseRequestQueue, slots=None, skip_cache=True):
+    crawler = Crawler(Spider)
     if slots is None:
         slots = {}
     spider = Spider.from_crawler(crawler, 'test_dd_spider')
     return cls(server=redis_server, spider=spider, key=QUEUE_KEY,
-               slots_mock=slots)
+               slots_mock=slots, skip_cache=skip_cache)
 
 
 def test_push_pop():

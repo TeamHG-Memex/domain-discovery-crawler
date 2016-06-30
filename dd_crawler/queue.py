@@ -1,10 +1,10 @@
+from functools import lru_cache
+import logging
 import random
+import time
+from typing import Optional, List, Tuple, Union, Dict
 from urllib.parse import urlsplit
 from zlib import crc32
-from typing import Optional, List, Tuple, Union, Dict
-import logging
-from functools import lru_cache
-import time
 
 from deepdeep.utils import softmax
 import numpy as np
@@ -13,7 +13,44 @@ from scrapy_redis.queue import Base
 
 from .utils import warn_if_slower
 
+
 logger = logging.getLogger(__name__)
+
+
+def cacheforawhile(method):
+    """ Cache method for some time, so that it does not become a bottleneck.
+    """
+    max_cache_time = 120  # seconds
+    cache_time_multiplier = 20
+    last_call_time = None
+    initial_cache_time = 0.5  # seconds
+    cache_time = initial_cache_time
+
+    @lru_cache(maxsize=1)
+    def cached_method(*args, **kwargs):
+        nonlocal cache_time
+        kwargs.pop('time_key')
+        t0 = time.time()
+        try:
+            return method(*args, **kwargs)
+        finally:
+            run_time = time.time() - t0
+            cache_time = min(max_cache_time, run_time * cache_time_multiplier)
+            if cache_time > initial_cache_time:
+                logger.info('{} took {:.2f} s, new cache time is {:.1f} s'
+                            .format(method.__name__, run_time, cache_time))
+
+    def inner(self, *args, **kwargs):
+        if self.skip_cache:
+            return method(self, *args, **kwargs)
+        nonlocal last_call_time
+        t = time.time()
+        if not last_call_time or (t - last_call_time > cache_time):
+            last_call_time = t
+        kwargs['time_key'] = last_call_time
+        return cached_method(self, *args, **kwargs)
+
+    return inner
 
 
 # Note about race conditions: there are several workers executing this code, but
@@ -29,7 +66,7 @@ class BaseRequestQueue(Base):
     when workers do not change (stale cache only leads to missing new domains
     for a while, so it's safe to set it to higher values).
     """
-    def __init__(self, *args, slots_mock=None, **kwargs):
+    def __init__(self, *args, slots_mock=None, skip_cache=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.len_key = '{}:len'.format(self.key)  # redis int
         self.queues_key = '{}:queues'.format(self.key)  # redis sorted set
@@ -41,8 +78,7 @@ class BaseRequestQueue(Base):
         self.n_requests = 0
         self.stat_each = 1000  # requests
         self.slots_mock = slots_mock
-        self.queue_cache_time = \
-            self.spider.settings.getint('QUEUE_CACHE_TIME', 1)  # seconds
+        self.skip_cache = skip_cache
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -94,40 +130,50 @@ class BaseRequestQueue(Base):
         """ Select which queue (domain) to use next.
         """
         idx, n_idx = self.discover()
-        time_step = time.time()
-        if self.queue_cache_time:
-            time_step = int(time_step / self.queue_cache_time)
-        my_queues = self.get_my_queues(idx, n_idx, time_step)
-        while my_queues:
-            queue = self.select_best_queue(my_queues)
+        self.get_my_queues(idx, n_idx)  # This is a caching trick:
+        # the trick is needed because get_available_queues calls
+        # get_my_queues, which is also cached, but we want independent
+        # runtime estimates for them. So we cache get_my_queues here, and
+        # runtime of get_available_queues does not include get_my_queues.
+        # TODO - track this in cacheforawhile
+        queue = self.select_best_queue(idx, n_idx)
+        if queue:
             if self.server.zcard(queue):
                 return queue
             else:
-                del my_queues[queue]
                 self.remove_empty_queue(queue)
 
     Queues = Dict[bytes, float]
 
-    def select_best_queue(self, queues: Queues) -> bytes:
+    def select_best_queue(self, idx, n_idx) -> Optional[bytes]:
         """ Select queue to crawl from, taking free slots into account.
         """
-        available_queues = self.get_available_queues(queues)
-        return random.choice(list(available_queues or queues))
+        available_queues, scores = self.get_available_queues(idx, n_idx)
+        if available_queues:
+            return random.choice(available_queues)
 
-    def get_available_queues(self, queues: Queues) -> Queues:
-        """ Return all queues with free slots.
+    @cacheforawhile
+    def get_available_queues(self, idx, n_idx) -> \
+            Tuple[List[bytes], Optional[np.ndarray]]:
+        """ Return all queues with free slots (or just all) and their weights.
         """
+        queues = self.get_my_queues(idx, n_idx)
         slots = (self.spider.crawler.engine.downloader.slots
                  if self.slots_mock is None else self.slots_mock)
-        available_queues = {}
+        available_queues, scores = [], []
+        all_queues, all_scores = [], []
         for q, s in queues.items():
+            all_scores.append(s)
+            all_queues.append(q)
             domain = self.queue_key_domain(q)
             if domain not in slots or slots[domain].free_transfer_slots():
-                available_queues[q] = s
-        return available_queues
+                available_queues.append(q)
+                scores.append(s)
+        return ((available_queues, np.array(scores)) if available_queues else
+                (all_queues, np.array(all_scores)))
 
-    @lru_cache(maxsize=1)
-    def get_my_queues(self, idx: int, n_idx: int, time_step: int) -> Queues:
+    @cacheforawhile
+    def get_my_queues(self, idx: int, n_idx: int) -> Queues:
         """ Get queues belonging to this worker.
         Here we cache not only expensive redis call, but a list comprehension
         below too.
@@ -243,14 +289,12 @@ class CompactQueue(BaseRequestQueue):
 
 
 class SoftmaxQueue(CompactQueue):
-    def select_best_queue(self, queues: BaseRequestQueue.Queues) -> bytes:
+    def select_best_queue(self, idx: int, n_idx: int) -> bytes:
         """ Select queue taking weights into account.
         """
         temprature = (
             self.spider.settings.getfloat('DD_BALANCING_TEMPERATURE') *
             self.spider.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
-        available_queues = self.get_available_queues(queues) or queues
-        keys = list(available_queues)
-        weights = [-available_queues[q] for q in keys]
-        p = softmax(weights, t=temprature)
-        return np.random.choice(keys, p=p)
+        available_queues, scores = self.get_available_queues(idx, n_idx)
+        p = softmax(-scores, t=temprature)
+        return np.random.choice(available_queues, p=p)

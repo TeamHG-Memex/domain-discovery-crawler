@@ -27,8 +27,6 @@ Settings:
 - ``DOMAIN_LIMIT`` (``True`` by default): stay within start domains
 - ``RESET_DEPTH`` (``False`` by default): reset depth to 0 when going to new
   domains (this allows to get a lot of new domains quickly)
-- ``QUEUE_CACHE_TIME`` (1 second by default) - time to cache the queues for.
- Set to higher values with more domains.
 - ``AUTOPAGER`` - prioritize pagination links
 
 For redis connection settings, refer to scrapy-redis docs.
