@@ -60,9 +60,13 @@ class DeepDeepSpider(GeneralSpider):
             yield request
 
     def parse(self, response):
+        if not isinstance(response, HtmlResponse):
+            return
+
         urls = self.clf.extract_urls(response.text, response.url)
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
             yield Request(url, priority=priority)
+
         yield self.page_item(response)
