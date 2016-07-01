@@ -71,7 +71,11 @@ into local ``./out`` folder).
 
 Profiling is enabled in the docker container, so you just need to send
 ``SIGUSR1`` to scrapy process in order to start/stop profiling. Result will be
-written to ``./out/${hostname}_N.vmprof``.
+written to ``./out/${hostname}_N.vmprof``. An example::
+
+    docker exec -it domaindiscoverycrawler_crawler_1 /bin/bash
+    kill -10 `ps aux | grep scrapy | grep -v grep | awk '{print $2}'`
+    kill -10 `ps aux | grep scrapy | grep -v grep | awk '{print $2}'`
 
 
 Docker system setup on Ubuntu 14.04
