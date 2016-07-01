@@ -1,7 +1,15 @@
 import contextlib
+import logging
 import re
+import os.path
+import signal
 import time
 from urllib.parse import urlsplit
+
+import vmprof
+
+
+logger = logging.getLogger(__name__)
 
 
 def warn_if_slower(limit, logger):
@@ -32,3 +40,31 @@ def dont_increase_depth(response):
         yield
     finally:
         response.meta['depth'] += 1
+
+
+def setup_profiling(profile):
+    file, filename = None, None
+
+    def handler(*_):
+        nonlocal file, filename
+        if file:
+            vmprof.disable()
+            file.close()
+            file = None
+            logger.info('vmprof saved to {}'.format(filename))
+        else:
+            filename = _get_prof_filename(profile)
+            file = open(filename, 'wb')
+            logger.info('vmprof writing to {}'.format(filename))
+            vmprof.enable(file.fileno(), period=0.01)
+
+    signal.signal(signal.SIGUSR1, handler)
+
+
+def _get_prof_filename(profile: str) -> str:
+    i = 1
+    while True:
+        filename = '{}_{}.vmprof'.format(profile, i)
+        if not os.path.exists(filename):
+            return filename
+        i += 1

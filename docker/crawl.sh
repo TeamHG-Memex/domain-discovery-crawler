@@ -14,6 +14,4 @@ while redis-cli -h redis get some-key-to-check-if-redis-is-ready | grep -q LOADI
 hostname=`hostname`
 
 echo "Crawling (see logs at /out/${hostname}.log)"
-scrapy crawl -o /out/${hostname}_items.jl -s REDIS_HOST=redis -s LOG_FILE=/out/${hostname}.log $*
-# Run a profiled crawl instead:
-# python -m vmprof -o /out/${hostname}.vmprof docker/exec_scrapy.py crawl -o /out/${hostname}_items.jl -s REDIS_HOST=redis -s LOG_FILE=/out/${hostname}.log $*
+scrapy crawl -o /out/${hostname}_items.jl -s REDIS_HOST=redis -s LOG_FILE=/out/${hostname}.log -a profile=/out/${hostname} $*

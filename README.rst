@@ -37,6 +37,14 @@ run (passing extra settings as needed)::
     scrapy queue_stats dd_crawler -o stats.json
 
 
+Profiling
+---------
+
+Profiling is done using `vmprof <https://vmprof.readthedocs.io>`_.
+Pass ``-a profile=basepath`` to the crawler, and then send ``SIGUSR1`` to start
+and stop profiling. Result will be in ``basepath_N.vmprof`` file.
+
+
 Using docker
 ------------
 
@@ -60,6 +68,10 @@ be written to ``${hostname}.log`` files.
 You can get queue with ``./docker/queue_stats.py``
 (or ``./docker/queue_stats.py  -o /out/stats.json`` if you want detailed output
 into local ``./out`` folder).
+
+Profiling is enabled in the docker container, so you just need to send
+``SIGUSR1`` to scrapy process in order to start/stop profiling. Result will be
+written to ``./out/${hostname}_N.vmprof``.
 
 
 Docker system setup on Ubuntu 14.04

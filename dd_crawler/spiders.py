@@ -5,19 +5,20 @@ from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
 
-from .utils import dont_increase_depth
-from .queue import SoftmaxQueue
+from .utils import dont_increase_depth, setup_profiling
 
 
 class GeneralSpider(Spider):
     name = 'dd_crawler'
 
-    def __init__(self, seeds=None):
+    def __init__(self, seeds=None, profile=None):
         super().__init__()
         self.le = LinkExtractor()
         if seeds:
             with open(seeds) as f:
                 self.start_urls = [line.strip() for line in f]
+        if profile:
+            setup_profiling(profile)
 
     def parse(self, response):
         if not isinstance(response, HtmlResponse):
