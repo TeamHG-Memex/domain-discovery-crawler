@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def cacheforawhile(method):
     """ Cache method for some time, so that it does not become a bottleneck.
     """
-    max_cache_time = 120  # seconds
+    max_cache_time = 180  # seconds
     cache_time_multiplier = 20
     last_call_time = None
     initial_cache_time = 0.5  # seconds
@@ -73,7 +73,7 @@ class BaseRequestQueue(Base):
         self.workers_key = '{}:workers'.format(self.key)  # redis set
         self.worker_id_key = '{}:worker-id'.format(self.key)  # redis int
         self.worker_id = self.server.incr(self.worker_id_key)
-        self.alive_timeout = 10  # seconds
+        self.alive_timeout = 120  # seconds
         self.im_alive()
         self.n_requests = 0
         self.stat_each = 1000  # requests
