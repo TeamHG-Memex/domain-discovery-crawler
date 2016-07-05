@@ -1,4 +1,5 @@
 import os.path
+import glob
 
 from bokeh.charts import TimeSeries
 import bokeh.plotting
@@ -24,8 +25,13 @@ class Command(ScrapyCommand):
     def run(self, args, opts):
         if not args:
             raise UsageError()
+        if len(args) == 1 and '*' in args[0]:
+            # paths were not expanded (docker)
+            args = glob.glob(args[0])
+        if not args:
+            raise UsageError()
 
-        all_rpms = [get_rpms(f, opts.step) for f in args]
+        all_rpms = list(filter(None, (get_rpms(f, opts.step) for f in args)))
         joined_rpms = all_rpms[0]
         for df in all_rpms[1:]:
             joined_rpms = joined_rpms.join(df, how='outer')
@@ -41,6 +47,7 @@ class Command(ScrapyCommand):
 
         plot = TimeSeries(joined_rpms, plot_width=1000)
         if opts.output:
+            print('Saving plot to {}'.format(opts.output))
             bokeh.plotting.save(plot, opts.output, title='Requests per minute')
         else:
             bokeh.plotting.show(plot)
@@ -51,6 +58,8 @@ def get_rpms(filename: str, step_s: float) -> pandas.DataFrame:
         filename, header=None, names=['timestamp', 'url'])
     timestamps = response_log['timestamp']
     buffer = []
+    if len(timestamps) == 0:
+        return
     t0 = timestamps[0]
     rpms = []
     for ts in timestamps:

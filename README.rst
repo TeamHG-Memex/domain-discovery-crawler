@@ -18,7 +18,7 @@ Usage
 
 Start crawl with some seeds::
 
-    scrapy crawl dd_crawler -a seeds=seeds.txt
+    scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
 
 Start other workers without specifying seeds.
 
@@ -35,6 +35,13 @@ To get a summary of queue stats and export full stats to json,
 run (passing extra settings as needed)::
 
     scrapy queue_stats dd_crawler -o stats.json
+
+To get a summary of response speed, set ``reponse_log`` argument, and use::
+
+    scrapy response_stat out/*.csv
+
+You can also specify ``-o`` or ``--output`` argument to save charts to html
+file instead of showing them.
 
 
 Profiling
@@ -65,9 +72,12 @@ Crawled items will be written in CDR format to the local ``./out`` folder,
 one ``${hostname}_items.jl`` file for each crawler worker, and logs will
 be written to ``${hostname}.log`` files.
 
-You can get queue with ``./docker/queue_stats.py``
+You can get queue stats with ``./docker/queue_stats.py``
 (or ``./docker/queue_stats.py  -o /out/stats.json`` if you want detailed output
 into local ``./out`` folder).
+
+You can get response speed stats with ``./docker/response_stats.py``, which
+writes some stats to the terminal and charts to ``./out/response_stats.html``.
 
 Profiling is enabled in the docker container, so you just need to send
 ``SIGUSR1`` to scrapy process in order to start/stop profiling. Result will be
