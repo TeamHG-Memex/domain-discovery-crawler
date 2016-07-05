@@ -1,3 +1,7 @@
+import csv
+import time
+from typing import Iterator
+
 import autopager
 from deepdeep.predictor import LinkClassifier
 from scrapy import Spider, Request
@@ -11,7 +15,7 @@ from .utils import dont_increase_depth, setup_profiling
 class GeneralSpider(Spider):
     name = 'dd_crawler'
 
-    def __init__(self, seeds=None, profile=None):
+    def __init__(self, seeds=None, profile=None, response_log=None):
         super().__init__()
         self.le = LinkExtractor()
         if seeds:
@@ -19,20 +23,30 @@ class GeneralSpider(Spider):
                 self.start_urls = [line.strip() for line in f]
         if profile:
             setup_profiling(profile)
+        if response_log:
+            self.response_log_file = open(response_log, 'a')
+            self.response_log = csv.writer(self.response_log_file)
 
     def parse(self, response):
         if not isinstance(response, HtmlResponse):
             return
+        yield from self.extract_urls(response)
+        yield self.page_item(response)
+        self.log_response(response)
 
+    def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
         if self.settings.getbool('AUTOPAGER'):
             for url in autopager.urls(response):
                 with dont_increase_depth(response):
                     yield Request(url=url)
-
         for link in self.le.extract_links(response):
             yield Request(url=link.url)
 
-        yield self.page_item(response)
+    def log_response(self, response: HtmlResponse):
+        if self.response_log:
+            self.response_log.writerow(
+                ['{:.3f}'.format(time.time()), response.url])
+            self.response_log_file.flush()
 
     def page_item(self, response):
         return text_cdr_item(
@@ -59,14 +73,9 @@ class DeepDeepSpider(GeneralSpider):
             request.priority = initial_priority
             yield request
 
-    def parse(self, response):
-        if not isinstance(response, HtmlResponse):
-            return
-
+    def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
         urls = self.clf.extract_urls(response.text, response.url)
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
             yield Request(url, priority=priority)
-
-        yield self.page_item(response)

@@ -18,7 +18,7 @@ class Command(ScrapyCommand):
                           help='dump stats into json file (use - for stdout)')
 
     def short_desc(self):
-        return 'Print short summary, dump queue stats to a file'
+        return 'Print short queue stats summary, dump detailed stats to a file'
 
     def run(self, args, opts):
         if len(args) != 1:
