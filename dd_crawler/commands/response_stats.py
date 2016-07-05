@@ -39,7 +39,7 @@ class Command(ScrapyCommand):
                 name, values[-1:].mean(), values[-last_n:].mean(), values.mean()))
         print()
 
-        plot = TimeSeries(joined_rpms)
+        plot = TimeSeries(joined_rpms, plot_width=1000)
         if opts.output:
             bokeh.plotting.save(plot, opts.output, title='Requests per minute')
         else:
