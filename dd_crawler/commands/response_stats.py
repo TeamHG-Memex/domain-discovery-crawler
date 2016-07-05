@@ -63,16 +63,17 @@ def get_rpms(filename: str, step: float) -> pandas.DataFrame:
     buffer = []
     if len(timestamps) == 0:
         return
-    t0 = timestamps[0]
+    get_t0 = lambda t: int(t / step) * step
+    t0 = get_t0(timestamps[0])
     rpms = []
     for ts in timestamps:
-        if ts - t0 > step:
-            rpms.append((t0, len(buffer) / step * 60))
-            t0 = ts
+        if get_t0(ts) != t0:
+            rpms.append((t0, len(buffer) / (ts - buffer[0]) * 60))
+            t0 = get_t0(ts)
             buffer = []
         buffer.append(ts)
-    name = os.path.basename(filename)
-    rpms = pandas.DataFrame(rpms, columns=['timestamp', name])
-    rpms.index = pandas.to_datetime(rpms.pop('timestamp'), unit='s')
-    return rpms
-
+    if rpms:
+        name = os.path.basename(filename)
+        rpms = pandas.DataFrame(rpms, columns=['timestamp', name])
+        rpms.index = pandas.to_datetime(rpms.pop('timestamp'), unit='s')
+        return rpms
