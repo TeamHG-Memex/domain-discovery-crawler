@@ -45,13 +45,19 @@ class Command(ScrapyCommand):
             'Name', opts.step, last_n * opts.step / 60, 'All'))
         for name, values in sorted(joined_rpms.items()):
             print('{:<50}\t{:.0f}\t{:.0f}\t{:.0f}'.format(
-                name, values[-1:].mean(), values[-last_n:].mean(), values.mean()))
+                name,
+                values[-1:].mean(),
+                values[-last_n:].mean(),
+                values.mean()))
         print()
 
-        plot = TimeSeries(joined_rpms, plot_width=1000)
+        title = 'Requests per minute'
+        plot = TimeSeries(joined_rpms, plot_width=1000,
+                          xlabel='time', ylabel='rpm', title=title)
         if opts.output:
             print('Saving plot to {}'.format(opts.output))
-            bokeh.plotting.save(plot, opts.output, title='Requests per minute')
+            bokeh.plotting.output_file(opts.output, title=title, mode='inline')
+            bokeh.plotting.save(plot)
         else:
             bokeh.plotting.show(plot)
 
