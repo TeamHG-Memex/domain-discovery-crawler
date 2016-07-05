@@ -31,7 +31,10 @@ class Command(ScrapyCommand):
         if not args:
             raise UsageError()
 
-        all_rpms = list(filter(None, (get_rpms(f, opts.step) for f in args)))
+        all_rpms = [rpms for rpms in (get_rpms(f, step=opts.step) for f in args)
+                    if rpms is not None]
+        if not all_rpms:
+            return
         joined_rpms = all_rpms[0]
         for df in all_rpms[1:]:
             joined_rpms = joined_rpms.join(df, how='outer')
@@ -53,7 +56,7 @@ class Command(ScrapyCommand):
             bokeh.plotting.show(plot)
 
 
-def get_rpms(filename: str, step_s: float) -> pandas.DataFrame:
+def get_rpms(filename: str, step: float) -> pandas.DataFrame:
     response_log = pandas.read_csv(
         filename, header=None, names=['timestamp', 'url'])
     timestamps = response_log['timestamp']
@@ -63,8 +66,8 @@ def get_rpms(filename: str, step_s: float) -> pandas.DataFrame:
     t0 = timestamps[0]
     rpms = []
     for ts in timestamps:
-        if ts - t0 > step_s:
-            rpms.append((t0, len(buffer) / step_s * 60))
+        if ts - t0 > step:
+            rpms.append((t0, len(buffer) / step * 60))
             t0 = ts
             buffer = []
         buffer.append(ts)
