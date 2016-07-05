@@ -18,6 +18,7 @@ class Command(ScrapyCommand):
         ScrapyCommand.add_options(self, parser)
         parser.add_option('-o', '--output', help='html file for charts')
         parser.add_option('--step', type=float, default=30, help='time step, s')
+        parser.add_option('--smooth', type=int, help='smooth span')
 
     def short_desc(self):
         return 'Print short speed summary, save charts to a file'
@@ -31,13 +32,16 @@ class Command(ScrapyCommand):
         if not args:
             raise UsageError()
 
-        all_rpms = [rpms for rpms in (get_rpms(f, step=opts.step) for f in args)
+        all_rpms = [rpms for rpms in (
+            get_rpms(f, step=opts.step, smooth=opts.smooth) for f in args)
                     if rpms is not None]
         if not all_rpms:
             return
         joined_rpms = all_rpms[0]
+        joined_rpms['all'] = all_rpms[0][all_rpms[0].columns[0]]
         for df in all_rpms[1:]:
             joined_rpms = joined_rpms.join(df, how='outer')
+            joined_rpms['all'] += df[df.columns[0]]
 
         last_n = 10
         print()
@@ -62,7 +66,7 @@ class Command(ScrapyCommand):
             bokeh.plotting.show(plot)
 
 
-def get_rpms(filename: str, step: float) -> pandas.DataFrame:
+def get_rpms(filename: str, step: float, smooth: int) -> pandas.DataFrame:
     response_log = pandas.read_csv(
         filename, header=None, names=['timestamp', 'url'])
     timestamps = response_log['timestamp']
@@ -81,5 +85,8 @@ def get_rpms(filename: str, step: float) -> pandas.DataFrame:
     if rpms:
         name = os.path.basename(filename)
         rpms = pandas.DataFrame(rpms, columns=['timestamp', name])
+        rpms.fillna(0, inplace=True)  # FIXME - this does not really work
+        if smooth:
+            rpms[name] = rpms[name].ewm(span=smooth).mean()
         rpms.index = pandas.to_datetime(rpms.pop('timestamp'), unit='s')
         return rpms
