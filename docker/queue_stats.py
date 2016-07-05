@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from dd_crawler.utils import run_in_docker
+from utils import run_in_docker
 
 
 def main():
