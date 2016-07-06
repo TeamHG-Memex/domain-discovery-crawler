@@ -14,7 +14,7 @@ SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 # Don't cleanup redis queues, allows to pause/resume crawls.
 SCHEDULER_PERSIST = True
 # SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.CompactQueue'
-SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.SoftmaxQueue'
+SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.BatchSoftmaxQueue'
 QUEUE_BATCH_SIZE = 1000
 
 COMMANDS_MODULE = 'dd_crawler.commands'

@@ -345,10 +345,12 @@ class BatchQueue(CompactQueue):
     def pop_multi(self) -> List[Request]:
         idx, n_idx = self.discover()
         queues = self.select_best_queues(idx, n_idx)
-        local_queue = []
-        for queue, n in Counter(queues).items():
-            local_queue.extend(reversed(self.pop_from_queue(queue, n)))
-        return local_queue
+        queue_counts = Counter(queues)
+        requests = [r for queue, n in queue_counts.items()
+                    for r in reversed(self.pop_from_queue(queue, n))]
+        logger.info('Popped {} requests from {} queues'.format(
+            len(requests), len(queue_counts)))
+        return requests
 
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
         available_queues, scores = self.get_my_queues(idx, n_idx)
