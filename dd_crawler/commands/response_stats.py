@@ -38,10 +38,11 @@ class Command(ScrapyCommand):
         if not all_rpms:
             return
         joined_rpms = all_rpms[0]
-        joined_rpms['all'] = all_rpms[0][all_rpms[0].columns[0]]
+        all_name = '<all>'
+        joined_rpms[all_name] = all_rpms[0][all_rpms[0].columns[0]]
         for df in all_rpms[1:]:
             joined_rpms = joined_rpms.join(df, how='outer')
-            joined_rpms['all'] += df[df.columns[0]]
+            joined_rpms[all_name] += df[df.columns[0]]
 
         last_n = 10
         print()

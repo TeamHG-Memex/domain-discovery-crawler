@@ -24,7 +24,7 @@ Start other workers without specifying seeds.
 
 Settings:
 
-- ``DOMAIN_LIMIT`` (``True`` by default): stay within start domains
+- ``DOMAIN_LIMIT`` (``False`` by default): stay within start domains
 - ``RESET_DEPTH`` (``False`` by default): reset depth to 0 when going to new
   domains (this allows to get a lot of new domains quickly)
 - ``AUTOPAGER`` - prioritize pagination links
