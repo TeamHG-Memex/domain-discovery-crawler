@@ -7,7 +7,8 @@ from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy_redis.scheduler import QUEUE_KEY
 
-from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue
+from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue, \
+    BatchSoftmaxQueue
 
 
 # allow test settings from environment
@@ -28,7 +29,8 @@ def server():
     return redis_server
 
 
-@pytest.fixture(params=[BaseRequestQueue, SoftmaxQueue, BatchQueue])
+@pytest.fixture(params=[
+    BaseRequestQueue, SoftmaxQueue, BatchQueue, BatchSoftmaxQueue])
 def queue_cls(request):
     return request.param
 

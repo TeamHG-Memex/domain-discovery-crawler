@@ -304,10 +304,7 @@ class SoftmaxQueue(CompactQueue):
         """
         available_queues, scores = self.get_available_queues(idx, n_idx)
         if available_queues:
-            temprature = (
-                self.spider.settings.getfloat('DD_BALANCING_TEMPERATURE') *
-                self.spider.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
-            p = softmax(-scores, t=temprature)
+            p = get_softmax_p(scores, self.spider.settings)
             queue = np.random.choice(available_queues, p=p)
             slots = self.get_slots()
             if not self.has_free_slots(queue, slots):
@@ -316,6 +313,13 @@ class SoftmaxQueue(CompactQueue):
                 # "bad" queue - it seems to be extremely rare in practice.
                 logger.info('Selected queue has no free slots')
             return queue
+
+
+def get_softmax_p(scores, settings):
+    temprature = (
+        settings.getfloat('DD_BALANCING_TEMPERATURE') *
+        settings.getfloat('DD_PRIORITY_MULTIPLIER'))
+    return softmax(-scores, t=temprature)
 
 
 class BatchQueue(CompactQueue):
@@ -349,8 +353,22 @@ class BatchQueue(CompactQueue):
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
         available_queues, scores = self.get_my_queues(idx, n_idx)
         if available_queues:
-            return list(np.random.choice(
-                available_queues,
-                size=self.spider.settings.getint('QUEUE_BATCH_SIZE', 1000)))
+            return list(
+                np.random.choice(available_queues, size=self.batch_size))
         else:
             return []
+
+    @property
+    def batch_size(self):
+        return self.spider.settings.getint('QUEUE_BATCH_SIZE', 1000)
+
+
+class BatchSoftmaxQueue(BatchQueue):
+    """ BatchQueue with queues chosen using softmax over queue priorities.
+    """
+    def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
+        available_queues, scores = self.get_my_queues(idx, n_idx)
+        if available_queues:
+            p = get_softmax_p(scores, self.spider.settings)
+            return list(np.random.choice(
+                available_queues, p=p, size=self.batch_size))
