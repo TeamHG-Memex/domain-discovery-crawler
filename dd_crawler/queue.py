@@ -154,23 +154,20 @@ class BaseRequestQueue(Base):
             return random.choice(available_queues)
 
     @cacheforawhile
-    def get_available_queues(self, idx, n_idx) -> \
-            Tuple[List[bytes], Optional[np.ndarray]]:
+    def get_available_queues(self, idx: int, n_idx: int)\
+            -> Tuple[List[bytes], np.ndarray]:
         """ Return all queues with free slots (or just all) and their weights.
         """
-        queues = self.get_my_queues(idx, n_idx)
+        all_queues, all_scores = self.get_my_queues(idx, n_idx)
         slots = self.get_slots()
         available_queues, scores = [], []
-        all_queues, all_scores = [], []
-        for q, s in queues.items():
-            all_scores.append(s)
-            all_queues.append(q)
+        for q, s in zip(all_queues, all_scores):
             domain = self.queue_key_domain(q)
             if domain not in slots or slots[domain].free_transfer_slots():
                 available_queues.append(q)
                 scores.append(s)
         return ((available_queues, np.array(scores)) if available_queues else
-                (all_queues, np.array(all_scores)))
+                (all_queues, all_scores))
 
     def get_slots(self) -> Dict:
         return (self.spider.crawler.engine.downloader.slots
@@ -181,15 +178,18 @@ class BaseRequestQueue(Base):
         return domain not in slots or slots[domain].free_transfer_slots()
 
     @cacheforawhile
-    def get_my_queues(self, idx: int, n_idx: int) -> Dict[bytes, float]:
+    def get_my_queues(self, idx: int, n_idx: int)\
+            -> Tuple[List[bytes], np.ndarray]:
         """ Get queues belonging to this worker.
-        Here we cache not only expensive redis call, but a list comprehension
-        below too.
-        time_step key makes the cache live self.queue_cache_time seconds.
-        Stale cache means we are not seeing new domains, nothing more.
+        Here we cache not only expensive redis call, but queue selection too.
         """
         queues = self.get_queues(withscores=True)
-        return {q: s for q, s in queues if crc32(q) % n_idx == idx}
+        my_queues, my_scores = [], []
+        for q, s in queues:
+            if crc32(q) % n_idx == idx:
+                my_queues.append(q)
+                my_scores.append(s)
+        return my_queues, np.array(my_scores)
 
     def discover(self) -> Tuple[int, int]:
         """ Return a tuple of (my index, total number of workers).
@@ -319,8 +319,10 @@ class SoftmaxQueue(CompactQueue):
 
 
 class BatchQueue(CompactQueue):
-    batch_size = 100
-
+    """ Adds batching of requests during pop: a QUEUE_BATCH_SIZE requests are
+    popped at once to the local queue, and are then used until the local queue
+    is empty.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.local_queue = []
@@ -333,11 +335,11 @@ class BatchQueue(CompactQueue):
     def pop(self, timeout=0) -> Optional[Request]:
         self.local_queue = self.local_queue or self.pop_multi()
         if self.local_queue:
+            # TODO - take free slots into account
             return self.local_queue.pop()
 
     def pop_multi(self) -> List[Request]:
         idx, n_idx = self.discover()
-        self.get_my_queues(idx, n_idx)  # This is a caching trick (see above)
         queues = self.select_best_queues(idx, n_idx)
         local_queue = []
         for queue, n in Counter(queues).items():
@@ -345,9 +347,10 @@ class BatchQueue(CompactQueue):
         return local_queue
 
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
-        available_queues, scores = self.get_available_queues(idx, n_idx)
+        available_queues, scores = self.get_my_queues(idx, n_idx)
         if available_queues:
             return list(np.random.choice(
-                available_queues, size=self.batch_size))
+                available_queues,
+                size=self.spider.settings.getint('QUEUE_BATCH_SIZE', 1000)))
         else:
             return []
