@@ -1,6 +1,7 @@
 from collections import Counter
 from functools import lru_cache
 import logging
+import math
 import random
 import time
 from typing import Optional, List, Tuple, Union, Dict
@@ -353,6 +354,9 @@ class BatchQueue(CompactQueue):
         return requests
 
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
+        """ Return a list of self.batch_size (if possible)
+        queues with repetition.
+        """
         available_queues, scores = self.get_my_queues(idx, n_idx)
         if available_queues:
             return list(
@@ -362,7 +366,7 @@ class BatchQueue(CompactQueue):
 
     @property
     def batch_size(self):
-        return self.spider.settings.getint('QUEUE_BATCH_SIZE', 1000)
+        return self.spider.settings.getint('QUEUE_BATCH_SIZE', 500)
 
 
 class BatchSoftmaxQueue(BatchQueue):
@@ -372,5 +376,24 @@ class BatchSoftmaxQueue(BatchQueue):
         available_queues, scores = self.get_my_queues(idx, n_idx)
         if available_queues:
             p = get_softmax_p(scores, self.spider.settings)
-            return list(np.random.choice(
-                available_queues, p=p, size=self.batch_size))
+            max_queue_size = int(math.ceil(self.spider.settings.getint(
+                'CONCURRENT_REQUESTS_PER_DOMAIN') * 0.5))
+            min_n_queues = int(math.ceil(
+                len(available_queues) / max_queue_size))
+            queues = np.random.choice(
+                available_queues, p=p, size=self.batch_size)
+            n_unique = len(set(queues))
+            if n_unique < min_n_queues:
+                logger.info(
+                    'Resampling without replacement due to low number of '
+                    'unique queues: got {} unique with {} total, '
+                    'while wanted at least {} unique.'
+                    .format(n_unique, len(queues), min_n_queues))
+                unique_queues = np.random.choice(
+                    available_queues, p=p, size=min_n_queues, replace=False)
+                queues = []
+                for q in unique_queues:
+                    queues.extend([q] * max(0, min(
+                        max_queue_size, self.batch_size - len(queues))))
+                random.shuffle(queues)
+            return queues
