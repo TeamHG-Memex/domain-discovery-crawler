@@ -26,6 +26,8 @@ class GeneralSpider(Spider):
         if response_log:
             self.response_log_file = open(response_log, 'a')
             self.response_log = csv.writer(self.response_log_file)
+        else:
+            self.response_log = None
 
     def parse(self, response):
         if not isinstance(response, HtmlResponse):
