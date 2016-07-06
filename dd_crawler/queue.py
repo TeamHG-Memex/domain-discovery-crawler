@@ -347,10 +347,15 @@ class BatchQueue(CompactQueue):
         idx, n_idx = self.discover()
         queues = self.select_best_queues(idx, n_idx)
         queue_counts = Counter(queues)
-        requests = [r for queue, n in queue_counts.items()
-                    for r in reversed(self.pop_from_queue(queue, n))]
-        logger.info('Popped {} requests from {} queues'.format(
-            len(requests), len(queue_counts)))
+        requests = []
+        unique_queues = set()
+        for queue, n in queue_counts.items():
+            rs = reversed(self.pop_from_queue(queue, n))
+            if rs:
+                requests.extend(rs)
+                unique_queues.add(queue)
+        logger.info('Got {} requests (out of {}) from {} unique queues'.format(
+            len(requests), len(queues), len(unique_queues)))
         return requests
 
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
@@ -374,26 +379,29 @@ class BatchSoftmaxQueue(BatchQueue):
     """
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
         available_queues, scores = self.get_my_queues(idx, n_idx)
-        if available_queues:
-            p = get_softmax_p(scores, self.spider.settings)
-            max_queue_size = int(math.ceil(self.spider.settings.getint(
-                'CONCURRENT_REQUESTS_PER_DOMAIN') * 0.5))
-            min_n_queues = int(math.ceil(
-                len(available_queues) / max_queue_size))
-            queues = np.random.choice(
-                available_queues, p=p, size=self.batch_size)
-            n_unique = len(set(queues))
-            if n_unique < min_n_queues:
-                logger.info(
-                    'Resampling without replacement due to low number of '
-                    'unique queues: got {} unique with {} total, '
-                    'while wanted at least {} unique.'
-                    .format(n_unique, len(queues), min_n_queues))
-                unique_queues = np.random.choice(
-                    available_queues, p=p, size=min_n_queues, replace=False)
-                queues = []
+        if not available_queues:
+            return []
+        p = get_softmax_p(scores, self.spider.settings)
+        max_queue_size = int(math.ceil(self.spider.settings.getint(
+            'CONCURRENT_REQUESTS_PER_DOMAIN') * 0.5))
+        min_n_queues = int(math.ceil(self.batch_size / max_queue_size))
+        queues = np.random.choice(
+            available_queues, p=p, size=self.batch_size)
+        n_unique = len(set(queues))
+        if n_unique < min_n_queues:
+            logger.info(
+                'Resampling without replacement due to low number of '
+                'unique queues: got {} unique with {} total, '
+                'while wanted at least {} unique'
+                .format(n_unique, len(queues), min_n_queues))
+            unique_queues = np.random.choice(
+                available_queues,
+                p=p, replace=False,
+                size=min(len(available_queues), min_n_queues))
+            queues = []
+            while len(queues) < self.batch_size:
                 for q in unique_queues:
                     queues.extend([q] * max(0, min(
                         max_queue_size, self.batch_size - len(queues))))
-                random.shuffle(queues)
-            return queues
+            random.shuffle(queues)
+        return queues
