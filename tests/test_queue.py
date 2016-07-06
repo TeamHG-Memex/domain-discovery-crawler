@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 import pytest
 import redis
@@ -65,12 +66,28 @@ def test_priority(server, queue_cls):
         'http://example.com/2',
         'http://example.com/1',
         'http://example.com/3']
+    assert q.pop() is None
 
 
 def test_domain_distribution(server, queue_cls):
     q1 = make_queue(server, queue_cls)
     q2 = make_queue(server, queue_cls)
     for url in ['http://a.com', 'http://a.com/foo', 'http://b.com',
-                'http://b.com/foo', 'http://c.com']:
+                'http://b.com/foo', 'http://tado8.com', 'http://tada.com',
+                'http://tada.com/asdfsd']:
         q1.push(Request(url=url))  # queue does not matter
-    # TODO
+    req1 = pop_all(q1)
+    req2 = pop_all(q2)
+    assert {r.url for r in req1} == {
+        'http://a.com', 'http://a.com/foo', 'http://b.com', 'http://b.com/foo'}
+    assert {r.url for r in req2} == {
+        'http://tado8.com', 'http://tada.com', 'http://tada.com/asdfsd'}
+
+
+def pop_all(q: BaseRequestQueue) -> List[Request]:
+    requests = []
+    while True:
+        r = q.pop()
+        if r is None:
+            return requests
+        requests.append(r)
