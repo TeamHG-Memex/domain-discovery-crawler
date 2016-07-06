@@ -1,3 +1,4 @@
+from collections import Counter
 from functools import lru_cache
 import logging
 import random
@@ -101,14 +102,16 @@ class BaseRequestQueue(Base):
         if queue_added:
             logger.debug('ADD queue {}'.format(queue_key))
 
-    def pop(self, timeout=0) -> Request:
+    def pop(self, timeout=0) -> Optional[Request]:
         self.n_requests += 1
         if self.n_requests % self.stat_each == 0:
             logger.info('Queue size: {}, domains: {}'.format(
                 len(self), self.server.zcard(self.queues_key)))
         queue_key = self.select_queue_key()
         if queue_key:
-            return self.pop_from_queue(queue_key)
+            results = self.pop_from_queue(queue_key, 1)
+            if results:
+                return results[0]
 
     def clear(self):
         keys = {
@@ -131,7 +134,7 @@ class BaseRequestQueue(Base):
         """
         idx, n_idx = self.discover()
         self.get_my_queues(idx, n_idx)  # This is a caching trick:
-        # the trick is needed because get_available_queues calls
+        # the trick above is needed because get_available_queues calls
         # get_my_queues, which is also cached, but we want independent
         # runtime estimates for them. So we cache get_my_queues here, and
         # runtime of get_available_queues does not include get_my_queues.
@@ -143,9 +146,7 @@ class BaseRequestQueue(Base):
             else:
                 self.remove_empty_queue(queue)
 
-    Queues = Dict[bytes, float]
-
-    def select_best_queue(self, idx, n_idx) -> Optional[bytes]:
+    def select_best_queue(self, idx: int, n_idx: int) -> Optional[bytes]:
         """ Select queue to crawl from, taking free slots into account.
         """
         available_queues, scores = self.get_available_queues(idx, n_idx)
@@ -180,7 +181,7 @@ class BaseRequestQueue(Base):
         return domain not in slots or slots[domain].free_transfer_slots()
 
     @cacheforawhile
-    def get_my_queues(self, idx: int, n_idx: int) -> Queues:
+    def get_my_queues(self, idx: int, n_idx: int) -> Dict[bytes, float]:
         """ Get queues belonging to this worker.
         Here we cache not only expensive redis call, but a list comprehension
         below too.
@@ -226,26 +227,28 @@ class BaseRequestQueue(Base):
     def _worker_key(self, worker_id) -> str:
         return '{}:worker-{}'.format(self.key, worker_id)
 
-    def pop_from_queue(self, queue_key: bytes) -> Request:
-        """ Pop value with highest priority from the given queue.
+    def pop_from_queue(self, queue_key: bytes, n: int) -> List[Request]:
+        """ Pop values with highest priorities from the given queue.
         """
         pipe = self.server.pipeline()
         pipe.multi()
-        pipe.zrange(queue_key, 0, 1, withscores=True)\
-            .zremrangebyrank(queue_key, 0, 0)
+        # Get one extra element to know new max score after pop
+        pipe.zrange(queue_key, 0, n, withscores=True)\
+            .zremrangebyrank(queue_key, 0, n - 1)
         results, count = pipe.execute()
         if results:
-            self.server.decr(self.len_key)
-            if len(results) == 2:
-                _, queue_score = results[1]
+            self.server.decr(self.len_key, count)
+            if len(results) == n + 1:
+                _, queue_score = results[-1]
                 self.server.zadd(
                     self.queues_key, **{queue_key.decode('utf8'): queue_score})
             else:
                 self.remove_empty_queue(queue_key)
-            return self._decode_request(results[0][0])
+            return [self._decode_request(r) for r, _ in results[:n]]
         else:
             # queue was empty: remove it from queues set
             self.remove_empty_queue(queue_key)
+            return []
 
     def remove_empty_queue(self, queue_key: bytes) -> None:
         # FIXME - maybe we should not remove empty queue keys? That can be racy
@@ -313,3 +316,38 @@ class SoftmaxQueue(CompactQueue):
                 # "bad" queue - it seems to be extremely rare in practice.
                 logger.info('Selected queue has no free slots')
             return queue
+
+
+class BatchQueue(CompactQueue):
+    batch_size = 100
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.local_queue = []
+
+    def __len__(self):
+        # FIXME - this is not quite correct, because super().__len__ is total
+        # queue size, but self.local_queue is for this worker only.
+        return super().__len__() + len(self.local_queue)
+
+    def pop(self, timeout=0) -> Optional[Request]:
+        self.local_queue = self.local_queue or self.pop_multi()
+        if self.local_queue:
+            return self.local_queue.pop()
+
+    def pop_multi(self) -> List[Request]:
+        idx, n_idx = self.discover()
+        self.get_my_queues(idx, n_idx)  # This is a caching trick (see above)
+        queues = self.select_best_queues(idx, n_idx)
+        local_queue = []
+        for queue, n in Counter(queues).items():
+            local_queue.extend(reversed(self.pop_from_queue(queue, n)))
+        return local_queue
+
+    def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
+        available_queues, scores = self.get_available_queues(idx, n_idx)
+        if available_queues:
+            return list(np.random.choice(
+                available_queues, size=self.batch_size))
+        else:
+            return []

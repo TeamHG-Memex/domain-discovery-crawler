@@ -7,7 +7,7 @@ from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy_redis.scheduler import QUEUE_KEY
 
-from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue
+from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue
 
 
 # allow test settings from environment
@@ -28,7 +28,7 @@ def server():
     return redis_server
 
 
-@pytest.fixture(params=[BaseRequestQueue, SoftmaxQueue, SoftmaxQueue])
+@pytest.fixture(params=[BaseRequestQueue, SoftmaxQueue, BatchQueue])
 def queue_cls(request):
     return request.param
 
@@ -45,15 +45,18 @@ def make_queue(redis_server, cls, slots=None, skip_cache=True):
 def test_push_pop(server, queue_cls):
     q = make_queue(server, queue_cls)
     assert q.pop() is None
+    assert len(q) == 0
     assert q.get_queues() == []
     r1 = Request('http://example.com', priority=100, meta={'depth': 10})
     q.push(r1)
+    assert len(q) == 1
     assert q.get_queues() == [b'test_dd_spider:requests:domain:example.com']
     assert q.select_queue_key() == b'test_dd_spider:requests:domain:example.com'
     r1_ = q.pop()
     assert r1_.url == r1.url
     assert r1_.priority == r1.priority
     assert r1_.meta['depth'] == r1.meta['depth']
+    assert len(q) == 0
     assert q.pop() is None
 
 
@@ -72,16 +75,19 @@ def test_priority(server, queue_cls):
 def test_domain_distribution(server, queue_cls):
     q1 = make_queue(server, queue_cls)
     q2 = make_queue(server, queue_cls)
-    for url in ['http://a.com', 'http://a.com/foo', 'http://b.com',
-                'http://b.com/foo', 'http://tado8.com', 'http://tada.com',
-                'http://tada.com/asdfsd']:
+    urls = ['http://a.com', 'http://a.com/foo', 'http://b.com',
+            'http://b.com/foo', 'http://tado8.com', 'http://tada.com',
+            'http://tada.com/asdfsd']
+    for url in urls:
         q1.push(Request(url=url))  # queue does not matter
-    req1 = pop_all(q1)
-    req2 = pop_all(q2)
-    assert {r.url for r in req1} == {
+    urls1 = {
         'http://a.com', 'http://a.com/foo', 'http://b.com', 'http://b.com/foo'}
-    assert {r.url for r in req2} == {
-        'http://tado8.com', 'http://tada.com', 'http://tada.com/asdfsd'}
+    urls2 = {'http://tado8.com', 'http://tada.com', 'http://tada.com/asdfsd'}
+    reqs1 = pop_all(q1)
+    assert {r.url for r in reqs1} == urls1
+    assert len(q1) == len(q2) == len(urls2)
+    reqs2 = pop_all(q2)
+    assert {r.url for r in reqs2} == urls2
 
 
 def pop_all(q: BaseRequestQueue) -> List[Request]:
