@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 def cacheforawhile(method):
     """ Cache method for some time, so that it does not become a bottleneck.
     """
-    max_cache_time = 180  # seconds
-    cache_time_multiplier = 20
+    max_cache_time = 30 * 60  # seconds
+    run_time_multiplier = 20
     last_call_time = None
     initial_cache_time = 0.5  # seconds
     cache_time = initial_cache_time
@@ -37,7 +37,7 @@ def cacheforawhile(method):
             return method(*args, **kwargs)
         finally:
             run_time = time.time() - t0
-            cache_time = min(max_cache_time, run_time * cache_time_multiplier)
+            cache_time = min(max_cache_time, run_time * run_time_multiplier)
             if cache_time > initial_cache_time:
                 logger.info('{} took {:.2f} s, new cache time is {:.1f} s'
                             .format(method.__name__, run_time, cache_time))
