@@ -318,8 +318,8 @@ class SoftmaxQueue(CompactQueue):
 
 def get_softmax_p(scores, settings):
     temprature = (
-        settings.getfloat('DD_BALANCING_TEMPERATURE') *
-        settings.getfloat('DD_PRIORITY_MULTIPLIER'))
+        settings.getfloat('DD_BALANCING_TEMPERATURE', 0.1) *
+        settings.getfloat('DD_PRIORITY_MULTIPLIER', 10000))
     return softmax(-scores, t=temprature)
 
 
@@ -379,12 +379,19 @@ class BatchSoftmaxQueue(BatchQueue):
     """
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
         available_queues, scores = self.get_my_queues(idx, n_idx)
-        if not available_queues:
-            return []
+        return self.select_queues_softmax(available_queues, scores) \
+            if available_queues else []
+
+    def select_queues_softmax(
+            self, available_queues: List[bytes], scores: np.ndarray)\
+            -> List[bytes]:
+        """ Select self.batch_size queues (with repetition) using softmax.
+        Try to select not greater than max_queue_n of each queue.
+        """
         p = get_softmax_p(scores, self.spider.settings)
-        max_queue_size = int(math.ceil(self.spider.settings.getint(
+        max_queue_n = int(math.ceil(self.spider.settings.getint(
             'CONCURRENT_REQUESTS_PER_DOMAIN') * 0.5))
-        min_n_queues = int(math.ceil(self.batch_size / max_queue_size))
+        min_n_queues = int(math.ceil(self.batch_size / max_queue_n))
         queues = np.random.choice(
             available_queues, p=p, size=self.batch_size)
         n_unique = len(set(queues))
@@ -394,14 +401,31 @@ class BatchSoftmaxQueue(BatchQueue):
                 'unique queues: got {} unique with {} total, '
                 'while wanted at least {} unique'
                 .format(n_unique, len(queues), min_n_queues))
-            unique_queues = np.random.choice(
-                available_queues,
-                p=p, replace=False,
-                size=min(len(available_queues), min_n_queues))
+            try:
+                unique_queues = np.random.choice(
+                    available_queues,
+                    p=p, replace=False,
+                    size=min(len(available_queues), min_n_queues))
+            except ValueError:
+                # Less non-zero entries in p than size:
+                # get all non-zero, and sample at random from the rest
+                logger.info(
+                    'Resampling due to low number of non-zero entries in p, '
+                    'min score is {}'.format(min(scores)))
+                unique_queues = list(
+                    np.array(available_queues)[np.nonzero(p)][:self.batch_size])
+                unique_queues_set = set(unique_queues)
+                while len(unique_queues_set) < min_n_queues:
+                    unique_queues_set.update(np.random.choice(
+                        available_queues,
+                        size=min(len(available_queues),
+                                 min_n_queues - len(unique_queues))))
+                # want to have unique_queues selected with p > 0 at the start
+                unique_queues.extend(unique_queues_set - set(unique_queues))
             queues = []
             while len(queues) < self.batch_size:
                 for q in unique_queues:
                     queues.extend([q] * max(0, min(
-                        max_queue_size, self.batch_size - len(queues))))
+                        max_queue_n, self.batch_size - len(queues))))
             random.shuffle(queues)
         return queues

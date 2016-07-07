@@ -1,10 +1,12 @@
 import os
 from typing import List
+from urllib.parse import urlsplit
 
 import pytest
 import redis
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
+from scrapy.utils.log import configure_logging
 from scrapy_redis.scheduler import QUEUE_KEY
 
 from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue, \
@@ -35,8 +37,15 @@ def queue_cls(request):
     return request.param
 
 
-def make_queue(redis_server, cls, slots=None, skip_cache=True):
-    crawler = Crawler(Spider)
+logging_configured = False
+
+
+def make_queue(redis_server, cls, slots=None, skip_cache=True, settings=None):
+    global logging_configured
+    if not logging_configured:
+        configure_logging(settings=settings)
+        logging_configured = True
+    crawler = Crawler(Spider, settings=settings)
     if slots is None:
         slots = {}
     spider = Spider.from_crawler(crawler, 'test_dd_spider')
@@ -90,6 +99,66 @@ def test_domain_distribution(server, queue_cls):
     assert len(q1) == len(q2) == len(urls2)
     reqs2 = pop_all(q2)
     assert {r.url for r in reqs2} == urls2
+
+
+def test_batch_softmax_queue_simple(server):
+    q = make_queue(server, BatchSoftmaxQueue, settings={'QUEUE_BATCH_SIZE': 50})
+    for domain_n in range(10):
+        for url_n in range(10):
+            q.push(Request(
+                url='http://domain-{}.com/{}'.format(domain_n, url_n),
+                priority=domain_n * url_n,
+            ))
+    res = q.pop_multi()
+    assert len(res) == 50
+    assert len({urlsplit(r.url).netloc for r in res}) == 10
+
+
+def test_batch_softmax_queue_one_domain(server):
+    q = make_queue(server, BatchSoftmaxQueue, settings={'QUEUE_BATCH_SIZE': 50})
+    for url_n in range(100):
+        q.push(Request(
+            url='http://domain.com/{}'.format(url_n),
+            priority=url_n,
+        ))
+    res = q.pop_multi()
+    assert len(res) == 50
+    assert len({r.url for r in res}) == 50
+
+
+def test_batch_softmax_enough_queues(server):
+    q = make_queue(server, BatchSoftmaxQueue, settings={'QUEUE_BATCH_SIZE': 50})
+    for domain_n in range(100):
+        for url_n in range(10):
+            q.push(Request(
+                url='http://domain-{}.com/{}'.format(domain_n, url_n),
+                priority=domain_n * url_n,
+            ))
+    res = q.pop_multi()
+    assert len(res) == 50
+    assert len({r.url for r in res}) == 50
+    assert len({urlsplit(r.url).netloc for r in res}) > 30
+
+
+def test_batch_softmax_high_prob(server, priority=10000):
+    q = make_queue(server, BatchSoftmaxQueue, settings={'QUEUE_BATCH_SIZE': 50})
+    for domain_n in range(100):
+        for url_n in range(5):
+            q.push(Request(
+                url='http://domain-{}.com/{}'.format(domain_n, url_n),
+                priority=priority
+                if (domain_n in [42, 43] and url_n == 1) else 0,
+            ))
+    res = q.pop_multi()
+    urls = {r.url for r in res}
+    assert 'http://domain-42.com/1' in urls
+    assert 'http://domain-43.com/1' in urls
+    assert len({urlsplit(r.url).netloc for r in res}) > 10
+    assert len(res) == 50
+
+
+def test_batch_softmax_degenerate_prob(server):
+    test_batch_softmax_high_prob(server, priority=100000000)
 
 
 def pop_all(q: BaseRequestQueue) -> List[Request]:
