@@ -87,7 +87,8 @@ class BaseRequestQueue(Base):
 
     def push(self, request: Request):
         data = self._encode_request(request)
-        score = -request.priority
+        score = -min(request.priority,
+                     self.spider.settings.getfloat('DD_MAX_SCORE', np.inf))
         queue_key = self.request_queue_key(request)
         added = self.server.zadd(queue_key, **{data: score})
         if added:
