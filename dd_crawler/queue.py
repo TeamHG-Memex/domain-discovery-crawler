@@ -5,13 +5,13 @@ import math
 import random
 import time
 from typing import Optional, List, Tuple, Union, Dict
-from urllib.parse import urlsplit
 from zlib import crc32
 
 from deepdeep.utils import softmax
 import numpy as np
 from scrapy import Request
 from scrapy_redis.queue import Base
+import tldextract
 
 from .utils import warn_if_slower
 
@@ -259,9 +259,9 @@ class BaseRequestQueue(Base):
             logger.debug('REM queue {}'.format(queue_key))
 
     def request_queue_key(self, request: Request) -> str:
-        """ Key for request queue (based on it's domain).
+        """ Key for request queue (based on it's SLD).
         """
-        domain = urlsplit(request.url).netloc
+        domain = tldextract.extract(request.url).registered_domain
         return '{}:domain:{}'.format(self.key, domain)
 
     def queue_key_domain(self, queue_key: bytes) -> str:

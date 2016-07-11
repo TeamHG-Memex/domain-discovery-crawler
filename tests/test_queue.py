@@ -53,6 +53,16 @@ def make_queue(redis_server, cls, slots=None, skip_cache=True, settings=None):
                slots_mock=slots, skip_cache=skip_cache)
 
 
+def test_request_queue_key(server):
+    q = make_queue(server, BaseRequestQueue)
+    assert q.request_queue_key(Request('http://wwww.example.com/foo')) == \
+        'test_dd_spider:requests:domain:example.com'
+    assert q.request_queue_key(Request('https://example2.com/foo')) == \
+        'test_dd_spider:requests:domain:example2.com'
+    assert q.request_queue_key(Request('http://app.example.co.uk')) == \
+        'test_dd_spider:requests:domain:example.co.uk'
+
+
 def test_push_pop(server, queue_cls):
     q = make_queue(server, queue_cls)
     assert q.pop() is None
