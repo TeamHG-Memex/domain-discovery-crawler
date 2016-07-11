@@ -8,7 +8,8 @@ RUN apt-get update && \
 COPY ./requirements.txt .
 
 RUN pip install -U pip setuptools wheel && \
-    pip install -r requirements.txt
+    pip install numpy pandas scrapy
+RUN pip install -r requirements.txt
 
 COPY ./docker/deep-deep-0.0.tar.gz .
 RUN pip install deep-deep-0.0.tar.gz
