@@ -18,6 +18,10 @@ Usage
 
 Start crawl with some seeds::
 
+    scrapy crawl deepdeep -a seeds=seeds.txt -a clf=Q.joblib -o out/items.jl
+
+or without deep-deep::
+
     scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
 
 Start other workers without specifying seeds.
@@ -27,7 +31,9 @@ Settings:
 - ``DOMAIN_LIMIT`` (``False`` by default): stay within start domains
 - ``RESET_DEPTH`` (``False`` by default): reset depth to 0 when going to new
   domains (this allows to get a lot of new domains quickly)
-- ``AUTOPAGER`` - prioritize pagination links
+- ``AUTOPAGER`` - prioritize pagination links (if not using deep-deep)
+- ``QUEUE_SCORES_LOG`` - log full queue selection process
+ for batch softmax queue
 
 For redis connection settings, refer to scrapy-redis docs.
 

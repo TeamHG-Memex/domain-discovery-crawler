@@ -1,5 +1,6 @@
 from collections import Counter
 from functools import lru_cache
+import json
 import logging
 import math
 import random
@@ -378,6 +379,11 @@ class BatchQueue(CompactQueue):
 class BatchSoftmaxQueue(BatchQueue):
     """ BatchQueue with queues chosen using softmax over queue priorities.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        scores_log = self.spider.settings.get('QUEUE_SCORES_LOG')
+        self.scores_log = open(scores_log, 'a') if scores_log else None
+
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
         available_queues, scores = self.get_my_queues(idx, n_idx)
         return self.select_queues_softmax(available_queues, scores) \
@@ -429,4 +435,18 @@ class BatchSoftmaxQueue(BatchQueue):
                     queues.extend([q] * max(0, min(
                         max_queue_n, self.batch_size - len(queues))))
             random.shuffle(queues)
+        self.log_scores(available_queues, scores, queues)
         return queues
+
+    def log_scores(self, available_queues, scores, queues):
+        if self.scores_log:
+            q_to_strs = lambda qs: [q.decode('utf8') for q in qs]
+            log_item = dict(
+                timestamp=time.time(),
+                scores=list(scores),
+                available_queues=q_to_strs(available_queues),
+                queues=q_to_strs(queues),
+            )
+            self.scores_log.write(json.dumps(log_item))
+            self.scores_log.write('\n')
+            self.scores_log.flush()
