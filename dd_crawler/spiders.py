@@ -5,6 +5,7 @@ from typing import Iterator
 import autopager
 from deepdeep.predictor import LinkClassifier
 from scrapy import Spider, Request
+from scrapy.http.response import Response
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
@@ -29,7 +30,7 @@ class GeneralSpider(Spider):
         else:
             self.response_log = None
 
-    def parse(self, response):
+    def parse(self, response: Response):
         if not isinstance(response, HtmlResponse):
             return
         yield from self.extract_urls(response)
@@ -47,16 +48,21 @@ class GeneralSpider(Spider):
     def log_response(self, response: HtmlResponse):
         if self.response_log:
             self.response_log.writerow(
-                ['{:.3f}'.format(time.time()), response.url])
+                ['{:.3f}'.format(time.time()),
+                 response.url,
+                 str(response.meta.get('depth', '')),
+                 str(response.request.priority),
+                 ])
             self.response_log_file.flush()
 
-    def page_item(self, response):
+    def page_item(self, response: HtmlResponse):
         return text_cdr_item(
             response,
             crawler_name=self.settings.get('CDR_CRAWLER'),
             team_name=self.settings.get('CDR_TEAM'),
             metadata={
                 'depth': response.meta.get('depth'),
+                'priority': response.request.priority,
             },
         )
 
