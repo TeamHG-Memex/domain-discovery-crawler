@@ -69,7 +69,7 @@ class Command(ScrapyCommand):
 
 def get_rpms(filename: str, step: float, smooth: int) -> pandas.DataFrame:
     response_log = pandas.read_csv(
-        filename, header=None, names=['timestamp', 'url'])
+        filename, header=None, names=['timestamp', 'url', 'depth', 'priority'])
     timestamps = response_log['timestamp']
     buffer = []
     if len(timestamps) == 0:
