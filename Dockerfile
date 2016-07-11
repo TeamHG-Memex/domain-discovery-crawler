@@ -5,10 +5,10 @@ WORKDIR /dd_crawler
 RUN apt-get update && \
     apt-get install -y dnsmasq redis-tools
 
-COPY ./requirements.txt .
-
 RUN pip install -U pip setuptools wheel && \
     pip install numpy pandas scrapy
+
+COPY ./requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY ./docker/deep-deep-0.0.tar.gz .
