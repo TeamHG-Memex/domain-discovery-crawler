@@ -34,6 +34,7 @@ Settings:
 - ``AUTOPAGER`` - prioritize pagination links (if not using deep-deep)
 - ``QUEUE_SCORES_LOG`` - log full queue selection process
  for batch softmax queue
+- ``QUEUE_MAX_DOMAINS`` - max number of domains
 
 For redis connection settings, refer to scrapy-redis docs.
 

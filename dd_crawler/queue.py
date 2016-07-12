@@ -82,15 +82,21 @@ class BaseRequestQueue(Base):
         self.stat_each = 1000  # requests
         self.slots_mock = slots_mock
         self.skip_cache = skip_cache
+        self.max_domains = self.spider.settings.getint('QUEUE_MAX_DOMAINS')
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
 
     def push(self, request: Request):
+        queue_key = self.request_queue_key(request)
+        if (self.max_domains and
+                self.server.zcard(self.queues_key) >= self.max_domains and
+                self.server.zrank(self.queues_key, queue_key) is None):
+            # Do not add new queue, limit has been reached
+            return
         data = self._encode_request(request)
         score = -min(request.priority,
                      self.spider.settings.getfloat('DD_MAX_SCORE', np.inf))
-        queue_key = self.request_queue_key(request)
         added = self.server.zadd(queue_key, **{data: score})
         if added:
             self.server.incr(self.len_key)
