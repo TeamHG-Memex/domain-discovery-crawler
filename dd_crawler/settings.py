@@ -3,6 +3,9 @@ BOT_NAME = 'dd_crawler'
 SPIDER_MODULES = ['dd_crawler.spiders']
 NEWSPIDER_MODULE = 'dd_crawler.spiders'
 
+CDR_TEAM = 'HG'
+CDR_CRAWLER = 'scrapy dd-crawler'
+
 USER_AGENT = (
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) '
     'AppleWebKit/537.36 (KHTML, like Gecko) '
