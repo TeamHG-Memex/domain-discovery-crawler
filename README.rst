@@ -38,6 +38,10 @@ Settings:
 
 For redis connection settings, refer to scrapy-redis docs.
 
+To export items to a .gz archive use gzip: scheme::
+
+    scrapy crawl dd_crawler -a seeds=seeds.txt -o gzip:out/items.jl
+
 To get a summary of queue stats and export full stats to json,
 run (passing extra settings as needed)::
 
