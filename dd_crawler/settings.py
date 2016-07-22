@@ -44,6 +44,10 @@ SPIDER_MIDDLEWARES = {
     'dd_crawler.middleware.domains.DomainControlMiddleware': 550,
 }
 
+FEED_STORAGES = {
+    'gzip': 'deepdeep.exports.GzipFileFeedStorage',
+}
+
 HTTPCACHE_ENABLED = False
 REDIRECT_ENABLED = True
 COOKIES_ENABLED = True
