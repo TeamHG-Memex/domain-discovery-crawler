@@ -268,7 +268,7 @@ class BaseRequestQueue(Base):
     def request_queue_key(self, request: Request) -> str:
         """ Key for request queue (based on it's SLD).
         """
-        domain = tldextract.extract(request.url).registered_domain
+        domain = tldextract.extract(request.url).registered_domain.lower()
         return '{}:domain:{}'.format(self.key, domain)
 
     def queue_key_domain(self, queue_key: bytes) -> str:
