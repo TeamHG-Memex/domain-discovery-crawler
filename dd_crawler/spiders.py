@@ -18,7 +18,7 @@ class GeneralSpider(Spider):
 
     def __init__(self, seeds=None, profile=None, response_log=None):
         super().__init__()
-        self.le = LinkExtractor()
+        self.le = LinkExtractor(canonicalize=False)
         if seeds:
             with open(seeds) as f:
                 self.start_urls = [line.strip() for line in f]
