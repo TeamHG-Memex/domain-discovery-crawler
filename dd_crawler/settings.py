@@ -40,8 +40,11 @@ DOWNLOADER_MIDDLEWARES = {
     'dd_crawler.middleware.domains.ForbidOffsiteRedirectsMiddleware': 600,
 }
 
+MAX_DUPLICATE_PATH_SEGMENTS = 5
+
 SPIDER_MIDDLEWARES = {
     'dd_crawler.middleware.domains.DomainControlMiddleware': 550,
+    'dd_crawler.middleware.dupesegments.DupeSegmentsMiddleware': 750,
 }
 
 FEED_STORAGES = {
