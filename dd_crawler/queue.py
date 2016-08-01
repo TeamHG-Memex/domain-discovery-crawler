@@ -73,6 +73,8 @@ class BaseRequestQueue(Base):
         super().__init__(*args, **kwargs)
         self.len_key = '{}:len'.format(self.key)  # redis int
         self.queues_key = '{}:queues'.format(self.key)  # redis sorted set
+        self.relevant_queues_key = '{}:relevant-queues'.format(self.key)  # set
+        self.selected_relevant_key = '{}:selected-relevant'.format(self.key)  # redis int
         self.workers_key = '{}:workers'.format(self.key)  # redis set
         self.worker_id_key = '{}:worker-id'.format(self.key)  # redis int
         self.worker_id = self.server.incr(self.worker_id_key)
@@ -83,6 +85,8 @@ class BaseRequestQueue(Base):
         self.slots_mock = slots_mock
         self.skip_cache = skip_cache
         self.max_domains = self.spider.settings.getint('QUEUE_MAX_DOMAINS')
+        self.max_relevant_domains = \
+            self.spider.settings.getint('QUEUE_MAX_RELEVANT_DOMAINS')
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -94,6 +98,9 @@ class BaseRequestQueue(Base):
                 self.server.zrank(self.queues_key, queue_key) is None):
             # Do not add new queue, limit has been reached
             return
+        if self.max_relevant_domains and request.meta.get('page_is_relevant'):
+            # Queue is relevant if it has relevant pages (we take max(score))
+            self.server.sadd(self.relevant_queues_key, queue_key)
         data = self._encode_request(request)
         score = -min(request.priority,
                      self.spider.settings.getfloat('DD_MAX_SCORE', np.inf))
@@ -123,8 +130,9 @@ class BaseRequestQueue(Base):
                 return results[0]
 
     def clear(self):
-        keys = {
-            self.len_key, self.queues_key, self.workers_key, self.worker_id_key}
+        keys = {self.len_key, self.queues_key, self.relevant_queues_key,
+                self.selected_relevant_key, self.workers_key,
+                self.worker_id_key}
         keys.update(self.get_workers())
         keys.update(self.get_queues())
         self.server.delete(*keys)
@@ -132,6 +140,16 @@ class BaseRequestQueue(Base):
 
     def get_queues(self, withscores=False) \
             -> Union[List[bytes], List[Tuple[bytes, float]]]:
+        if (self.max_relevant_domains and
+                not self.server.get(self.selected_relevant_key) and
+                self.server.scard(self.relevant_queues_key) >=
+                self.max_relevant_domains):
+            irrelevant = set(self.server.zrange(self.queues_key, 0, -1)) - \
+                         set(self.server.smembers(self.relevant_queues_key))
+            logger.info(
+                'Removing {} irrelevant domains'.format(len(irrelevant)))
+            self.server.zrem(self.queues_key, *irrelevant)
+            self.server.set(self.selected_relevant_key, 1)
         return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
 
     def get_workers(self) -> List[bytes]:

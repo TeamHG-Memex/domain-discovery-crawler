@@ -98,6 +98,23 @@ def test_max_domains(server, queue_cls):
                     'http://domain-2.com/foo', 'http://domain-1.com/foo'}
 
 
+def test_max_relevant_domains(server, queue_cls):
+    q = make_queue(server, queue_cls, settings={'QUEUE_MAX_RELEVANT_DOMAINS': 2})
+    q.push(Request('http://domain-1.com', meta={'page_is_relevant': True}))
+    q.push(Request('http://domain-2.com'))
+    q.push(Request('http://domain-3.com/foo'))
+    q.push(Request('http://domain-2.com/foo', meta={'page_is_relevant': True}))
+    q.push(Request('http://domain-1.com/foo'))
+    urls = set()
+    while True:
+        r = q.pop()
+        if r is None:
+            break
+        urls.add(r.url)
+    assert urls == {'http://domain-1.com', 'http://domain-2.com',
+                    'http://domain-2.com/foo', 'http://domain-1.com/foo'}
+
+
 def test_priority(server, queue_cls):
     q = make_queue(server, queue_cls)
     q.push(Request('http://example.com/1', priority=10))
