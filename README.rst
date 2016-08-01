@@ -18,8 +18,11 @@ Usage
 
 Start crawl with some seeds::
 
-    scrapy crawl deepdeep -a seeds=seeds.txt -a clf=Q.joblib -o out/items.jl
+    scrapy crawl deepdeep -a seeds=seeds.txt \
+        -a clf=Q.joblib -a page_clf=page_clf.joblib \
+        -o out/items.jl
 
+(``Q.clf`` is from deep-deep, and ``page_clf.joblib`` is from domain-discovery-eval),
 or without deep-deep::
 
     scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
