@@ -95,23 +95,17 @@ class BaseRequestQueue(Base):
     def push(self, request: Request) -> bool:
         """ Push request to queue. Return False if it has not been pushed.
         """
-        queue_key = self.request_queue_key(request)
+        queue_key = self.url_queue_key(request.url)
         if (self.max_domains and
                 self.server.zcard(self.queues_key) >= self.max_domains and
                 self.server.zrank(self.queues_key, queue_key) is None):
             # Do not add new queue, limit has been reached
             return False
-        if self.max_relevant_domains:
-            if self.selected_relevant():
-                if not self.server.sismember(
-                        self.relevant_queues_key, queue_key):
-                    # Such requests could come from the time we selected
-                    # relevant domains: some requests were in fly or in batches.
-                    return False
-            elif request.meta.get('page_is_relevant'):
-                # Queue is relevant if it has relevant pages
-                # (queue score = max(page score))
-                self.server.sadd(self.relevant_queues_key, queue_key)
+        if (self.max_relevant_domains and self.selected_relevant() and
+                not self.server.sismember(self.relevant_queues_key, queue_key)):
+            # Such requests could come from the time we selected
+            # relevant domains: some requests were in fly or in batches.
+            return False
         data = self._encode_request(request)
         score = -min(request.priority,
                      self.spider.settings.getfloat('DD_MAX_SCORE', np.inf))
@@ -133,8 +127,12 @@ class BaseRequestQueue(Base):
     def pop(self, timeout=0) -> Optional[Request]:
         self.n_requests += 1
         if self.n_requests % self.stat_each == 0:
-            logger.info('Queue size: {}, domains: {}'.format(
-                len(self), self.server.zcard(self.queues_key)))
+            logger.info('Queue size: {}, domains: {}{}'.format(
+                len(self),
+                self.server.zcard(self.queues_key),
+                ' relevant domains: {}'.format(
+                    self.server.scard(self.relevant_queues_key))
+                if self.max_relevant_domains else ''))
         queue_key = self.select_queue_key()
         if queue_key:
             results = self.pop_from_queue(queue_key, 1)
@@ -176,6 +174,13 @@ class BaseRequestQueue(Base):
         """ Relevant domains have already been selected.
         """
         return bool(self.server.get(self.selected_relevant_key))
+
+    def page_is_relevant(self, url: str):
+        if self.max_relevant_domains:
+            # Queue is relevant if it has relevant pages:
+            # queue score = max(page score)
+            queue_key = self.url_queue_key(url)
+            self.server.sadd(self.relevant_queues_key, queue_key)
 
     def get_workers(self) -> List[bytes]:
         return self.server.smembers(self.workers_key)
@@ -308,10 +313,10 @@ class BaseRequestQueue(Base):
         if removed:
             logger.debug('REM queue {}'.format(queue_key))
 
-    def request_queue_key(self, request: Request) -> str:
+    def url_queue_key(self, url: str) -> str:
         """ Key for request queue (based on it's SLD).
         """
-        domain = tldextract.extract(request.url).registered_domain.lower()
+        domain = tldextract.extract(url).registered_domain.lower()
         return '{}:domain:{}'.format(self.key, domain)
 
     def queue_key_domain(self, queue_key: bytes) -> str:

@@ -53,13 +53,13 @@ def make_queue(redis_server, cls, slots=None, skip_cache=True, settings=None):
                slots_mock=slots, skip_cache=skip_cache)
 
 
-def test_request_queue_key(server):
+def test_queue_key(server):
     q = make_queue(server, BaseRequestQueue)
-    assert q.request_queue_key(Request('http://wwww.example.com/foo')) == \
+    assert q.url_queue_key('http://wwww.example.com/foo') == \
         'test_dd_spider:requests:domain:example.com'
-    assert q.request_queue_key(Request('https://example2.com/foo')) == \
+    assert q.url_queue_key('https://example2.com/foo') == \
         'test_dd_spider:requests:domain:example2.com'
-    assert q.request_queue_key(Request('http://app.example.co.uk')) == \
+    assert q.url_queue_key('http://app.example.co.uk') == \
         'test_dd_spider:requests:domain:example.co.uk'
 
 
@@ -101,12 +101,12 @@ def test_max_domains(server, queue_cls):
 def test_max_relevant_domains(server, queue_cls):
     q = make_queue(server, queue_cls,
                    settings={'QUEUE_MAX_RELEVANT_DOMAINS': 2})
-    assert q.push(Request('http://domain-1.com',
-                          meta={'page_is_relevant': True}))
+    assert q.push(Request('http://domain-1.com'))
+    q.page_is_relevant('http://domain-1.com')
     assert q.push(Request('http://domain-2.com'))
     assert q.push(Request('http://domain-3.com/foo'))
-    assert q.push(Request('http://domain-2.com/foo',
-                          meta={'page_is_relevant': True}))
+    assert q.push(Request('http://domain-2.com/foo'))
+    q.page_is_relevant('http://domain-2.com/foo')
     assert q.push(Request('http://domain-1.com/foo'))
     # did not pop yet, so can push a new domain
     assert q.push(Request('http://domain-4.com/foo'))
