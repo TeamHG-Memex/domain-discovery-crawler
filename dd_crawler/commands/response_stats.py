@@ -1,5 +1,6 @@
 import os.path
 import glob
+from typing import Dict, List
 
 from bokeh.charts import TimeSeries
 import bokeh.plotting
@@ -16,7 +17,8 @@ class Command(ScrapyCommand):
 
     def add_options(self, parser):
         ScrapyCommand.add_options(self, parser)
-        parser.add_option('-o', '--output', help='html file for charts')
+        parser.add_option('-o', '--output',
+                          help='base name for charts (without html)')
         parser.add_option('--step', type=float, default=30, help='time step, s')
         parser.add_option('--smooth', type=int, help='smooth span')
 
@@ -32,44 +34,23 @@ class Command(ScrapyCommand):
         if not args:
             raise UsageError()
 
+        response_logs = [
+            pandas.read_csv(filename, header=None, names=[
+                'timestamp', 'url', 'depth', 'priority', 'score'])
+            for filename in args]
+
         all_rpms = [rpms for rpms in (
-            get_rpms(f, step=opts.step, smooth=opts.smooth) for f in args)
+            get_rpms(name, rlog, step=opts.step, smooth=opts.smooth)
+            for name, rlog in zip(args, response_logs))
                     if rpms is not None]
-        if not all_rpms:
-            return
-        joined_rpms = all_rpms[0]
-        all_name = '<all>'
-        joined_rpms[all_name] = all_rpms[0][all_rpms[0].columns[0]]
-        for df in all_rpms[1:]:
-            joined_rpms = joined_rpms.join(df, how='outer')
-            joined_rpms[all_name] += df[df.columns[0]]
+        if all_rpms:
+            print_rpms(all_rpms, opts)
 
-        last_n = 10
-        print()
-        print('{:<50}\t{:.0f} s\t{:.0f} m\t{}'.format(
-            'Name', opts.step, last_n * opts.step / 60, 'All'))
-        for name, values in sorted(joined_rpms.items()):
-            print('{:<50}\t{:.0f}\t{:.0f}\t{:.0f}'.format(
-                name,
-                values[-1:].mean(),
-                values[-last_n:].mean(),
-                values.mean()))
-        print()
-
-        title = 'Requests per minute'
-        plot = TimeSeries(joined_rpms, plot_width=1000,
-                          xlabel='time', ylabel='rpm', title=title)
-        if opts.output:
-            print('Saving plot to {}'.format(opts.output))
-            bokeh.plotting.output_file(opts.output, title=title, mode='inline')
-            bokeh.plotting.save(plot)
-        else:
-            bokeh.plotting.show(plot)
+        print_scores(response_logs, opts)
 
 
-def get_rpms(filename: str, step: float, smooth: int) -> pandas.DataFrame:
-    response_log = pandas.read_csv(
-        filename, header=None, names=['timestamp', 'url', 'depth', 'priority'])
+def get_rpms(filename: str, response_log: pandas.DataFrame,
+             step: float, smooth: int) -> pandas.DataFrame:
     timestamps = response_log['timestamp']
     buffer = []
     if len(timestamps) == 0:
@@ -91,3 +72,59 @@ def get_rpms(filename: str, step: float, smooth: int) -> pandas.DataFrame:
             rpms[name] = rpms[name].ewm(span=smooth).mean()
         rpms.index = pandas.to_datetime(rpms.pop('timestamp'), unit='s')
         return rpms
+
+
+def print_rpms(all_rpms: List[pandas.DataFrame], opts):
+    joined_rpms = all_rpms[0]
+    all_name = '<all>'
+    joined_rpms[all_name] = all_rpms[0][all_rpms[0].columns[0]]
+    for df in all_rpms[1:]:
+        joined_rpms = joined_rpms.join(df, how='outer')
+        joined_rpms[all_name] += df[df.columns[0]]
+    print_averages(joined_rpms, opts.step)
+    rpms_title = 'Requests per minute'
+    rpms_plot = TimeSeries(joined_rpms, plot_width=1000,
+                           xlabel='time', ylabel='rpm', title=rpms_title)
+    save_plot(rpms_plot, title=rpms_title, suffix='rpms', output=opts.output)
+
+
+def save_plot(plot, title, suffix, output):
+    if output:
+        rpms_output = '{}-{}.html'.format(output, suffix)
+        print('Saving plot to {}'.format(rpms_output))
+        bokeh.plotting.output_file(rpms_output, title=title, mode='inline')
+        bokeh.plotting.save(plot)
+    else:
+        bokeh.plotting.show(plot)
+
+
+def print_averages(items: Dict[str, pandas.Series], step: int, fmt: str = '{:.0f}'):
+    last_n = 10
+    print()
+    print('{:<50}\t{:.0f} s\t{:.0f} m\t{}'.format(
+        'Name', step, last_n * step / 60, 'All'))
+    tpl = '{{:<50}}\t{fmt}\t{fmt}\t{fmt}'.format(fmt=fmt)
+    for name, values in sorted(items.items()):
+        print(tpl.format(
+            name,
+            values[-1:].mean(),
+            values[-last_n:].mean(),
+            values.mean()))
+    print()
+
+
+def print_scores(response_logs: List[pandas.DataFrame], opts):
+    joined = pandas.DataFrame()
+    for df in response_logs:
+        df.index = df.pop('url')
+        joined = joined.join(df, how='outer')
+    joined.sort_values(by='timestamp', inplace=True)
+    joined.index = pandas.to_datetime(joined.pop('timestamp'), unit='s')
+    if opts.smooth:
+        span = opts.smooth * opts.step
+        joined['score'] = (joined['score'] > 0.5).ewm(span=span).mean()
+    print_averages({'score': joined['score']}, opts.step, '{:.2f}')
+    title = 'Page relevancy score'
+    plot = TimeSeries(joined['score'], plot_width=1000,
+                      xlabel='time', ylabel='score', title=title)
+    save_plot(plot, title=title, suffix='score', output=opts.output)
