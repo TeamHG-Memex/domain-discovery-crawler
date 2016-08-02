@@ -80,7 +80,7 @@ class BaseRequestQueue(Base):
         self.worker_id = self.server.incr(self.worker_id_key)
         self.alive_timeout = 120  # seconds
         self.im_alive()
-        self.n_requests = 0
+        self.n_pops = 0
         self.stat_each = 1000  # requests
         self.slots_mock = slots_mock
         self.skip_cache = skip_cache
@@ -125,19 +125,22 @@ class BaseRequestQueue(Base):
         return True
 
     def pop(self, timeout=0) -> Optional[Request]:
-        self.n_requests += 1
-        if self.n_requests % self.stat_each == 0:
+        self.log_queue_stats()
+        queue_key = self.select_queue_key()
+        if queue_key:
+            results = self.pop_from_queue(queue_key, 1)
+            if results:
+                return results[0]
+
+    def log_queue_stats(self):
+        self.n_pops += 1
+        if self.n_pops % self.stat_each == 0:
             logger.info('Queue size: {}, domains: {}{}'.format(
                 len(self),
                 self.server.zcard(self.queues_key),
                 ' relevant domains: {}'.format(
                     self.server.scard(self.relevant_queues_key))
                 if self.max_relevant_domains else ''))
-        queue_key = self.select_queue_key()
-        if queue_key:
-            results = self.pop_from_queue(queue_key, 1)
-            if results:
-                return results[0]
 
     def clear(self):
         keys = {self.len_key, self.queues_key, self.relevant_queues_key,
@@ -394,6 +397,7 @@ class BatchQueue(CompactQueue):
         return super().__len__() + len(self.local_queue)
 
     def pop(self, timeout=0) -> Optional[Request]:
+        self.log_queue_stats()
         self.local_queue = self.local_queue or self.pop_multi()
         if self.local_queue:
             # TODO - take free slots into account
