@@ -98,11 +98,12 @@ def save_plot(plot, title, suffix, output):
         bokeh.plotting.show(plot)
 
 
-def print_averages(items: Dict[str, pandas.Series], step: int, fmt: str = '{:.0f}'):
+def print_averages(items: Dict[str, pandas.Series],
+                   step: int, fmt: str = '{:.0f}'):
     last_n = 10
     print()
     print('{:<50}\t{:.0f} s\t{:.0f} m\t{}'.format(
-        'Name', step, last_n * step / 60, 'All'))
+        '', step, last_n * step / 60, 'All'))
     tpl = '{{:<50}}\t{fmt}\t{fmt}\t{fmt}'.format(fmt=fmt)
     for name, values in sorted(items.items()):
         print(tpl.format(
@@ -118,6 +119,12 @@ def print_scores(response_logs: List[pandas.DataFrame], opts):
     for df in response_logs:
         df.index = df.pop('url')
         joined = joined.join(df, how='outer')
+    binary_score = joined['score'] > 0.5
+    print()
+    print('Total number of pages: {}, relevant pages: {}, '
+          'average binary score: {:.2f}, average score: {:.2f}'.format(
+            len(joined), binary_score.sum(), binary_score.mean(),
+            joined['score'].mean()))
     joined.sort_values(by='timestamp', inplace=True)
     joined.index = pandas.to_datetime(joined.pop('timestamp'), unit='s')
     if opts.smooth:
