@@ -87,20 +87,31 @@ class BaseRequestQueue(Base):
         self.max_domains = self.spider.settings.getint('QUEUE_MAX_DOMAINS')
         self.max_relevant_domains = \
             self.spider.settings.getint('QUEUE_MAX_RELEVANT_DOMAINS')
+        self.set_spider_domain_limit()
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
 
-    def push(self, request: Request):
+    def push(self, request: Request) -> bool:
+        """ Push request to queue. Return False if it has not been pushed.
+        """
         queue_key = self.request_queue_key(request)
         if (self.max_domains and
                 self.server.zcard(self.queues_key) >= self.max_domains and
                 self.server.zrank(self.queues_key, queue_key) is None):
             # Do not add new queue, limit has been reached
-            return
-        if self.max_relevant_domains and request.meta.get('page_is_relevant'):
-            # Queue is relevant if it has relevant pages (we take max(score))
-            self.server.sadd(self.relevant_queues_key, queue_key)
+            return False
+        if self.max_relevant_domains:
+            if self.selected_relevant():
+                if not self.server.sismember(
+                        self.relevant_queues_key, queue_key):
+                    # Such requests could come from the time we selected
+                    # relevant domains: some requests were in fly or in batches.
+                    return False
+            elif request.meta.get('page_is_relevant'):
+                # Queue is relevant if it has relevant pages
+                # (queue score = max(page score))
+                self.server.sadd(self.relevant_queues_key, queue_key)
         data = self._encode_request(request)
         score = -min(request.priority,
                      self.spider.settings.getfloat('DD_MAX_SCORE', np.inf))
@@ -117,6 +128,7 @@ class BaseRequestQueue(Base):
             self.queues_key, **{queue_key: queue_score})
         if queue_added:
             logger.debug('ADD queue {}'.format(queue_key))
+        return True
 
     def pop(self, timeout=0) -> Optional[Request]:
         self.n_requests += 1
@@ -141,7 +153,7 @@ class BaseRequestQueue(Base):
     def get_queues(self, withscores=False) \
             -> Union[List[bytes], List[Tuple[bytes, float]]]:
         if (self.max_relevant_domains and
-                not self.server.get(self.selected_relevant_key) and
+                not self.selected_relevant() and
                 self.server.scard(self.relevant_queues_key) >=
                 self.max_relevant_domains):
             irrelevant = set(self.server.zrange(self.queues_key, 0, -1)) - \
@@ -150,7 +162,20 @@ class BaseRequestQueue(Base):
                 'Removing {} irrelevant domains'.format(len(irrelevant)))
             self.server.zrem(self.queues_key, *irrelevant)
             self.server.set(self.selected_relevant_key, 1)
+        self.set_spider_domain_limit()
         return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
+
+    def set_spider_domain_limit(self):
+        """ Set domain_limit attribute on the spider: it is read by middlewares
+        that limit spider to existing domains.
+        """
+        if self.max_relevant_domains and self.selected_relevant():
+            self.spider.domain_limit = True
+
+    def selected_relevant(self) -> bool:
+        """ Relevant domains have already been selected.
+        """
+        return bool(self.server.get(self.selected_relevant_key))
 
     def get_workers(self) -> List[bytes]:
         return self.server.smembers(self.workers_key)

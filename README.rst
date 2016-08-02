@@ -38,6 +38,8 @@ Settings:
 - ``QUEUE_SCORES_LOG`` - log full queue selection process
  for batch softmax queue
 - ``QUEUE_MAX_DOMAINS`` - max number of domains
+- ``QUEUE_MAX_RELEVANT_DOMAINS`` - max number of relevant domains: domain is considered
+  relevant if some page from that domain is considered relevant by ``page_clf``
 
 For redis connection settings, refer to scrapy-redis docs.
 

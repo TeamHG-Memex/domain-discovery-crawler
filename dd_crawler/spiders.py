@@ -11,8 +11,7 @@ from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
 
-from .utils import dont_increase_depth, setup_profiling
-from .page_clf import PageClassifier
+from .utils import dont_increase_depth, setup_profiling, PageClassifier
 
 
 class GeneralSpider(Spider):
@@ -92,13 +91,13 @@ class DeepDeepSpider(GeneralSpider):
     def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
         urls = self.link_clf.extract_urls(response.text, response.url)
         page_score = self.page_score(response)
-        is_relevant = page_score > 0.5
+        page_is_relevant = page_score > 0.5
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
             yield Request(url, priority=priority,
-                          meta={'page_is_relevant': is_relevant})
+                          meta={'page_is_relevant': page_is_relevant})
 
     def page_item(self, response: HtmlResponse) -> Item:
         item = super().page_item(response)
-        item['metadata']['page_score'] = self.page_score(response)
+        item['extracted_metadata']['page_score'] = self.page_score(response)
