@@ -1,7 +1,7 @@
 import csv
 from functools import lru_cache
 import time
-from typing import Iterator
+from typing import Iterator, List
 
 import autopager
 from deepdeep.predictor import LinkClassifier
@@ -48,13 +48,15 @@ class GeneralSpider(Spider):
 
     def log_response(self, response: HtmlResponse):
         if self.response_log:
-            self.response_log.writerow(
-                ['{:.3f}'.format(time.time()),
-                 response.url,
-                 str(response.meta.get('depth', '')),
-                 str(response.request.priority),
-                 ])
+            self.response_log.writerow(self.response_log_item(response))
             self.response_log_file.flush()
+
+    def response_log_item(self, response: HtmlResponse) -> List[str]:
+        return ['{:.3f}'.format(time.time()),
+                response.url,
+                str(response.meta.get('depth', '')),
+                str(response.request.priority),
+                ]
 
     def page_item(self, response: HtmlResponse) -> Item:
         return text_cdr_item(
@@ -101,4 +103,9 @@ class DeepDeepSpider(GeneralSpider):
     def page_item(self, response: HtmlResponse) -> Item:
         item = super().page_item(response)
         item['extracted_metadata']['page_score'] = self.page_score(response)
+        return item
+
+    def response_log_item(self, response: HtmlResponse) -> List[str]:
+        item = super().response_log_item(response)
+        item.append(str(self.page_score(response)))
         return item
