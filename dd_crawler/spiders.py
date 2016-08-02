@@ -1,16 +1,17 @@
 import csv
+from functools import lru_cache
 import time
 from typing import Iterator
 
 import autopager
 from deepdeep.predictor import LinkClassifier
-from scrapy import Spider, Request
+from scrapy import Spider, Request, Item
 from scrapy.http.response import Response
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
 
-from .utils import dont_increase_depth, setup_profiling
+from .utils import dont_increase_depth, setup_profiling, PageClassifier
 
 
 class GeneralSpider(Spider):
@@ -55,7 +56,7 @@ class GeneralSpider(Spider):
                  ])
             self.response_log_file.flush()
 
-    def page_item(self, response: HtmlResponse):
+    def page_item(self, response: HtmlResponse) -> Item:
         return text_cdr_item(
             response,
             crawler_name=self.settings.get('CDR_CRAWLER'),
@@ -70,9 +71,11 @@ class GeneralSpider(Spider):
 class DeepDeepSpider(GeneralSpider):
     name = 'deepdeep'
 
-    def __init__(self, clf=None, **kwargs):
-        if clf:  # can be empty if we juss want to get queue stats
-            self.clf = LinkClassifier.load(clf)
+    def __init__(self, clf=None, page_clf=None, **kwargs):
+        if clf:  # can be empty if we just want to get queue stats
+            self.link_clf = LinkClassifier.load(clf)
+        if page_clf:
+            self.page_clf = PageClassifier(page_clf)
         super().__init__(**kwargs)
 
     def start_requests(self):
@@ -81,9 +84,20 @@ class DeepDeepSpider(GeneralSpider):
             request.priority = initial_priority
             yield request
 
+    @lru_cache(maxsize=1)
+    def page_score(self, response: HtmlResponse) -> float:
+        return self.page_clf.get_score(response.text)
+
     def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
-        urls = self.clf.extract_urls(response.text, response.url)
+        urls = self.link_clf.extract_urls(response.text, response.url)
+        page_score = self.page_score(response)
+        page_is_relevant = page_score > 0.5
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
-            yield Request(url, priority=priority)
+            yield Request(url, priority=priority,
+                          meta={'page_is_relevant': page_is_relevant})
+
+    def page_item(self, response: HtmlResponse) -> Item:
+        item = super().page_item(response)
+        item['extracted_metadata']['page_score'] = self.page_score(response)

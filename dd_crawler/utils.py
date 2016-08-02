@@ -6,6 +6,8 @@ import signal
 import time
 from urllib.parse import urlsplit
 
+from deepdeep.utils import html2text
+from sklearn.externals import joblib
 import vmprof
 
 
@@ -68,3 +70,11 @@ def _get_prof_filename(profile: str) -> str:
         if not os.path.exists(filename):
             return filename
         i += 1
+
+
+class PageClassifier:
+    def __init__(self, clf_filename):
+        self.clf = joblib.load(clf_filename)
+
+    def get_score(self, html: str) -> float:
+        return self.clf.predict_proba([html2text(html)])[0][1]

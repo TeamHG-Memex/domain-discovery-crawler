@@ -18,8 +18,11 @@ Usage
 
 Start crawl with some seeds::
 
-    scrapy crawl deepdeep -a seeds=seeds.txt -a clf=Q.joblib -o out/items.jl
+    scrapy crawl deepdeep -a seeds=seeds.txt \
+        -a clf=Q.joblib -a page_clf=page_clf.joblib \
+        -o out/items.jl
 
+(``Q.clf`` is from deep-deep, and ``page_clf.joblib`` is from domain-discovery-eval),
 or without deep-deep::
 
     scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
@@ -35,6 +38,8 @@ Settings:
 - ``QUEUE_SCORES_LOG`` - log full queue selection process
  for batch softmax queue
 - ``QUEUE_MAX_DOMAINS`` - max number of domains
+- ``QUEUE_MAX_RELEVANT_DOMAINS`` - max number of relevant domains: domain is considered
+  relevant if some page from that domain is considered relevant by ``page_clf``
 
 For redis connection settings, refer to scrapy-redis docs.
 

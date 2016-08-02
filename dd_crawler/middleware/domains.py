@@ -11,12 +11,21 @@ from ..utils import get_domain
 logger = logging.getLogger(__name__)
 
 
-class ForbidOffsiteRedirectsMiddleware(RedirectMiddleware):
-    """ Forbid doing off-domain redirects when DOMAIN_LIMIT is True.
+class GetDomainLimitFromSpider:
+    def __init__(self, domain_limit):
+        self._domain_limit = domain_limit
+
+    def domain_limit(self, spider):
+        return getattr(spider, 'domain_limit', self._domain_limit)
+
+
+class ForbidOffsiteRedirectsMiddleware(
+        RedirectMiddleware, GetDomainLimitFromSpider):
+    """ Forbid doing off-domain redirects when domain limit is True.
 
     Usage:
 
-    DOMAIN_LIMIT = True
+    Set domain_limit on spider instance, or DOMAIN_LIMIT in settings
     DOWNLOADER_MIDDLEWARES = {
         'scrapy.downloadermiddlewares.redirect.RedirectMiddleware': None,
         'dd_crawler.middleware.domains.ForbidOffsiteRedirectsMiddleware': 600,
@@ -24,30 +33,30 @@ class ForbidOffsiteRedirectsMiddleware(RedirectMiddleware):
     """
     def __init__(self, settings):
         super().__init__(settings)
-        self.domain_limit = settings.getbool('DOMAIN_LIMIT')
+        GetDomainLimitFromSpider.__init__(self, settings.getbool('DOMAIN_LIMIT'))
 
     def _redirect(self, redirected, request, spider, reason):
-        if self.domain_limit and \
+        if self.domain_limit(spider) and \
                 get_domain(redirected.url) != get_domain(request.url):
             raise IgnoreRequest('Redirecting off-domain')
         return super()._redirect(redirected, request, spider, reason)
 
 
-class DomainControlMiddleware:
+class DomainControlMiddleware(GetDomainLimitFromSpider):
     """ Control domains when making requests:
-    - do not make off-domain requests when DOMAIN_LIMIT is True
+    - do not make off-domain requests when domain limit is True
     - reset depth for off-domain requests when RESET_DEPTH is True
 
     Usage:
 
-    DOMAIN_LIMIT = True or False
+    Set domain_limit on spider instance, or DOMAIN_LIMIT in settings
     RESET_DEPTH = True or False
     SPIDER_MIDDLEWARES = {
         'dd_crawler.middleware.domains.DomainControlMiddleware': 550,
     }
     """
     def __init__(self, *, domain_limit, reset_depth):
-        self.domain_limit = domain_limit
+        super().__init__(domain_limit)
         self.reset_depth = reset_depth
 
     @classmethod
@@ -64,7 +73,7 @@ class DomainControlMiddleware:
                 yield item
             else:
                 different_domain = get_domain(item.url) != domain
-                if self.domain_limit and different_domain:
+                if self.domain_limit(spider) and different_domain:
                     logger.debug('Dropping off-domain request {}'.format(item))
                 else:
                     with _reset_depth_if(
