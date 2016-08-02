@@ -101,3 +101,4 @@ class DeepDeepSpider(GeneralSpider):
     def page_item(self, response: HtmlResponse) -> Item:
         item = super().page_item(response)
         item['extracted_metadata']['page_score'] = self.page_score(response)
+        return item
