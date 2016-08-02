@@ -20,7 +20,7 @@ class Command(ScrapyCommand):
         parser.add_option('-o', '--output',
                           help='base name for charts (without html)')
         parser.add_option('--step', type=float, default=30, help='time step, s')
-        parser.add_option('--smooth', type=int, help='smooth span')
+        parser.add_option('--smooth', type=int, default=50, help='smooth span')
 
     def short_desc(self):
         return 'Print short speed summary, save charts to a file'
@@ -115,10 +115,7 @@ def print_averages(items: Dict[str, pandas.Series],
 
 
 def print_scores(response_logs: List[pandas.DataFrame], opts):
-    joined = pandas.DataFrame()
-    for df in response_logs:
-        df.index = df.pop('url')
-        joined = joined.join(df, how='outer')
+    joined = pandas.concat(response_logs)
     binary_score = joined['score'] > 0.5
     print()
     print('Total number of pages: {}, relevant pages: {}, '
