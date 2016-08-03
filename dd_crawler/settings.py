@@ -41,6 +41,7 @@ DOWNLOADER_MIDDLEWARES = {
 }
 
 MAX_DUPLICATE_PATH_SEGMENTS = 5
+MAX_DUPLICATE_QUERY_SEGMENTS = 3
 
 SPIDER_MIDDLEWARES = {
     'dd_crawler.middleware.domains.DomainControlMiddleware': 550,
