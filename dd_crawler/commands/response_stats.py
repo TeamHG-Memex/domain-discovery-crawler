@@ -125,10 +125,13 @@ def print_scores(response_logs: List[pandas.DataFrame], opts):
     joined.sort_values(by='timestamp', inplace=True)
     joined.index = pandas.to_datetime(joined.pop('timestamp'), unit='s')
     if opts.smooth:
-        span = opts.smooth * opts.step
+        crawl_time = (joined.index[-1] - joined.index[0]).total_seconds()
+        avg_rps = len(joined) / crawl_time
+        span = int(opts.smooth * opts.step * avg_rps)
         joined['score'] = (joined['score'] > 0.5).ewm(span=span).mean()
     print_averages({'score': joined['score']}, opts.step, '{:.2f}')
     title = 'Page relevancy score'
-    plot = TimeSeries(joined['score'], plot_width=1000,
+    scores = joined['score'].resample('{}S'.format(opts.step)).mean()
+    plot = TimeSeries(scores, plot_width=1000,
                       xlabel='time', ylabel='score', title=title)
     save_plot(plot, title=title, suffix='score', output=opts.output)
