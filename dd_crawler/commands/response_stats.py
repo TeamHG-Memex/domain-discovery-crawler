@@ -4,6 +4,7 @@ import re
 from typing import Dict, List
 
 from bokeh.charts import TimeSeries
+from bokeh.models import Range1d
 import bokeh.plotting
 import pandas
 from scrapy.commands import ScrapyCommand
@@ -143,4 +144,5 @@ def print_scores(response_logs: List[pandas.DataFrame], opts):
     scores = joined['score'].resample('{}S'.format(opts.step)).mean()
     plot = TimeSeries(scores, plot_width=1000,
                       xlabel='time', ylabel='score', title=title)
+    plot.set(y_range=Range1d(0, 1))
     save_plot(plot, title=title, suffix='score', output=opts.output)
