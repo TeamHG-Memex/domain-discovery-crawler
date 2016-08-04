@@ -18,7 +18,7 @@ SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 SCHEDULER_PERSIST = True
 # SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.CompactQueue'
 SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.BatchSoftmaxQueue'
-QUEUE_BATCH_SIZE = 500
+QUEUE_BATCH_SIZE = 100
 
 COMMANDS_MODULE = 'dd_crawler.commands'
 

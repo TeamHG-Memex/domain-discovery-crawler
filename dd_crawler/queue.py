@@ -431,7 +431,7 @@ class BatchQueue(CompactQueue):
 
     @property
     def batch_size(self):
-        return self.spider.settings.getint('QUEUE_BATCH_SIZE', 500)
+        return self.spider.settings.getint('QUEUE_BATCH_SIZE', 100)
 
 
 class BatchSoftmaxQueue(BatchQueue):
