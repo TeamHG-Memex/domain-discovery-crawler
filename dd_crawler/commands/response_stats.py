@@ -1,5 +1,6 @@
 import os.path
 import glob
+import re
 from typing import Dict, List
 
 from bokeh.charts import TimeSeries
@@ -30,18 +31,26 @@ class Command(ScrapyCommand):
             raise UsageError()
         if len(args) == 1 and '*' in args[0]:
             # paths were not expanded (docker)
-            args = glob.glob(args[0])
-        if not args:
+            filenames = glob.glob(args[0])
+        else:
+            filenames = args
+        del args
+        filtered_filenames = [
+            f for f in filenames
+            if re.match(r'[a-z0-9]{12}\.csv$', os.path.basename(f))]
+        filenames = filtered_filenames or filenames
+        if not filenames:
             raise UsageError()
 
         response_logs = [
             pandas.read_csv(filename, header=None, names=[
                 'timestamp', 'url', 'depth', 'priority', 'score'])
-            for filename in args]
+            for filename in filenames]
+        print('Read data from {} files'.format(len(filenames)))
 
         all_rpms = [rpms for rpms in (
             get_rpms(name, rlog, step=opts.step, smooth=opts.smooth)
-            for name, rlog in zip(args, response_logs))
+            for name, rlog in zip(filenames, response_logs))
                     if rpms is not None]
         if all_rpms:
             print_rpms(all_rpms, opts)
