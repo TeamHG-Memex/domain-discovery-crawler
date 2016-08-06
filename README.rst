@@ -1,6 +1,14 @@
 Domain Discovery Crawler
 ========================
 
+This is a scrapy crawler that uses Redis queues and link classification model from
+deep-deep for large-scale focused crawls.
+
+Preferred installation and running method is using docker,
+but you can also run it without it, which is described first.
+
+.. contents::
+
 Install
 -------
 
@@ -36,14 +44,16 @@ Settings:
   domains (this allows to get a lot of new domains quickly)
 - ``AUTOPAGER`` - prioritize pagination links (if not using deep-deep)
 - ``QUEUE_SCORES_LOG`` - log full queue selection process
- for batch softmax queue
+  for batch softmax queue
 - ``QUEUE_MAX_DOMAINS`` - max number of domains
 - ``QUEUE_MAX_RELEVANT_DOMAINS`` - max number of relevant domains: domain is considered
-  relevant if some page from that domain is considered relevant by ``page_clf``
+  relevant if some page from that domain is considered relevant by ``page_clf``.
+  Crawler drops all irrelevant domains after gathering
+  the specified number of relevant ones, and does not go to new domains any more.
 
 For redis connection settings, refer to scrapy-redis docs.
 
-To export items to a .gz archive use gzip: scheme::
+To export items to a .gz archive use ``gzip:`` scheme::
 
     scrapy crawl dd_crawler -a seeds=seeds.txt -o gzip:out/items.jl
 
@@ -75,8 +85,8 @@ Build dd-crawler image::
 
     docker build -t dd-crawler .
 
-Start everything (this will take seeds from local ``./seeds.txt``, and
-deep-deep model from ``./Q.joblib``)::
+Start everything (this will take seeds from local ``./seeds.txt``,
+deep-deep model from ``./Q.joblib`` and page relevancy model from ``./page_clf.joblib``)::
 
     docker-compose up -d
 
@@ -85,8 +95,12 @@ After that, you can set desired number of crawler workers (4 in this example) wi
     docker-compose scale crawler=4
 
 Crawled items will be written in CDR format to the local ``./out`` folder,
-one ``${hostname}_items.jl`` file for each crawler worker, and logs will
-be written to ``${hostname}.log`` files.
+one ``${hostname}_items.jl.gz`` file for each crawler worker, logs will
+be written to ``${hostname}.log`` files, and downloaded urls with page scores
+to ``${hostname}.csv`` files.
+
+If you want to change default settings (described above),
+edit the ``docker-compose.yml`` file.
 
 You can get queue stats with ``./docker/queue_stats.py``
 (or ``./docker/queue_stats.py  -o /out/stats.json`` if you want detailed output
