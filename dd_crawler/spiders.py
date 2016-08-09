@@ -81,22 +81,32 @@ class DeepDeepSpider(GeneralSpider):
         super().__init__(**kwargs)
 
     def start_requests(self):
-        initial_priority = 10 * self.settings.getfloat('DD_PRIORITY_MULTIPLIER')
+        initial_priority = int(
+            10 * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
         for request in super().start_requests():
             request.priority = initial_priority
-            yield request
+            if self.queue is not None:
+                self.queue.push(request)
+            else:
+                yield request
 
     @lru_cache(maxsize=1)
     def page_score(self, response: HtmlResponse) -> float:
         return self.page_clf.get_score(response.text)
 
+    @property
+    def queue(self):
+        try:
+            return self.crawler.engine.slot.scheduler.queue
+        except AttributeError:
+            return None
+
     def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
         urls = self.link_clf.extract_urls(response.text, response.url)
         page_score = self.page_score(response)
-        queue = self.crawler.engine.slot.scheduler.queue
         page_is_relevant = page_score > 0.5
         if page_is_relevant:
-            queue.page_is_relevant(response.url)
+            self.queue.page_is_relevant(response.url)
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
