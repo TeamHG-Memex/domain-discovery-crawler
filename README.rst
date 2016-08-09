@@ -43,8 +43,8 @@ Settings:
 - ``RESET_DEPTH`` (``False`` by default): reset depth to 0 when going to new
   domains (this allows to get a lot of new domains quickly)
 - ``AUTOPAGER`` - prioritize pagination links (if not using deep-deep)
-- ``QUEUE_SCORES_LOG`` - log full queue selection process
-  for batch softmax queue
+- ``QUEUE_SCORES_LOG`` - log full queue selection process for batch softmax queue
+  (written in ``.jl.gz`` format).
 - ``QUEUE_MAX_DOMAINS`` - max number of domains
 - ``QUEUE_MAX_RELEVANT_DOMAINS`` - max number of relevant domains: domain is considered
   relevant if some page from that domain is considered relevant by ``page_clf``.

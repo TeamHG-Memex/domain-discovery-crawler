@@ -1,5 +1,6 @@
 from collections import Counter
 from functools import lru_cache
+import gzip
 import json
 import logging
 import math
@@ -440,7 +441,7 @@ class BatchSoftmaxQueue(BatchQueue):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scores_log = self.spider.settings.get('QUEUE_SCORES_LOG')
-        self.scores_log = open(scores_log, 'a') if scores_log else None
+        self.scores_log = gzip.open(scores_log, 'at') if scores_log else None
 
     def select_best_queues(self, idx: int, n_idx: int) -> List[bytes]:
         available_queues, scores = self.get_my_queues(idx, n_idx)
