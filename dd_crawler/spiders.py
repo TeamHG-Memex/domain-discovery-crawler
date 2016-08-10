@@ -102,7 +102,7 @@ class DeepDeepSpider(GeneralSpider):
             return None
 
     def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
-        urls = self.link_clf.extract_urls(response.text, response.url)
+        urls = self.link_clf.extract_urls_from_response(response)
         page_score = self.page_score(response)
         page_is_relevant = page_score > 0.5
         if page_is_relevant:
