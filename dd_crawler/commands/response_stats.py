@@ -142,7 +142,7 @@ def print_scores(response_logs: List[pandas.DataFrame], opts):
         crawl_time = (joined.index[-1] - joined.index[0]).total_seconds()
         avg_rps = len(joined) / crawl_time
         span = int(opts.smooth * opts.step * avg_rps)
-        joined['score'] = (joined['score'] > 0.5).ewm(span=span).mean()
+        joined['score'] = joined['score'].ewm(span=span).mean()
     print_averages({'score': joined['score']}, opts.step, '{:.2f}')
     title = 'Page relevancy score'
     scores = joined['score'].resample('{}S'.format(opts.step)).mean()
