@@ -5,6 +5,7 @@ import json
 import logging
 import math
 import random
+import sys
 import time
 from typing import Optional, List, Tuple, Union, Dict
 from zlib import crc32
@@ -86,6 +87,11 @@ class BaseRequestQueue(Base):
         self.slots_mock = slots_mock
         self.skip_cache = skip_cache
         self.max_domains = self.spider.settings.getint('QUEUE_MAX_DOMAINS')
+        if self.max_domains:
+            print('QUEUE_MAX_DOMAINS has a bug: '
+                  'domains which queue becomes empty during crawling '
+                  'can disappear from the domain queue.',
+                  file=sys.stderr)
         self.max_relevant_domains = \
             self.spider.settings.getint('QUEUE_MAX_RELEVANT_DOMAINS')
         self.set_spider_domain_limit()
