@@ -52,6 +52,10 @@ FEED_STORAGES = {
     'gzip': 'deepdeep.exports.GzipFileFeedStorage',
 }
 
+EXTENSIONS = {
+    'deepdeep.extensions.DumpStatsExtension': 101,
+}
+
 HTTPCACHE_ENABLED = False
 REDIRECT_ENABLED = True
 COOKIES_ENABLED = True
