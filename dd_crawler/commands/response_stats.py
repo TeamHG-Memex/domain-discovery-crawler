@@ -20,7 +20,7 @@ class Command(ScrapyCommand):
     def add_options(self, parser):
         ScrapyCommand.add_options(self, parser)
         parser.add_option('-o', '--output',
-                          help='base name for charts (without html)')
+                          help='prefix for charts (without ".html")')
         parser.add_option('--step', type=float, default=30, help='time step, s')
         parser.add_option('--smooth', type=int, default=50, help='smooth span')
 
@@ -77,7 +77,6 @@ def get_rpms(filename: str, response_log: pandas.DataFrame,
     if rpms:
         name = os.path.basename(filename)
         rpms = pandas.DataFrame(rpms, columns=['timestamp', name])
-        rpms.fillna(0, inplace=True)  # FIXME - this does not really work
         if smooth:
             rpms[name] = rpms[name].ewm(span=smooth).mean()
         rpms.index = pandas.to_datetime(rpms.pop('timestamp'), unit='s')
@@ -85,12 +84,17 @@ def get_rpms(filename: str, response_log: pandas.DataFrame,
 
 
 def print_rpms(all_rpms: List[pandas.DataFrame], opts):
-    joined_rpms = all_rpms[0]
-    all_name = '<all>'
-    joined_rpms[all_name] = all_rpms[0][all_rpms[0].columns[0]]
-    for df in all_rpms[1:]:
+    joined_rpms = pandas.DataFrame()
+    for df in all_rpms:
         joined_rpms = joined_rpms.join(df, how='outer')
-        joined_rpms[all_name] += df[df.columns[0]]
+    joined_rpms.fillna(0, inplace=True)
+
+    all_name = '<all>'
+    col_names = [df.columns[0] for df in all_rpms]
+    joined_rpms[all_name] = joined_rpms[col_names[0]]
+    for col_name in col_names[1:]:
+        joined_rpms[all_name] += joined_rpms[col_name]
+
     print_averages(joined_rpms, opts.step)
     rpms_title = 'Requests per minute'
     rpms_plot = TimeSeries(joined_rpms, plot_width=1000,
