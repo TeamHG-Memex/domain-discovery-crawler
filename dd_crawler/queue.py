@@ -186,6 +186,8 @@ class BaseRequestQueue(Base):
         return bool(self.server.get(self.selected_relevant_key))
 
     def page_is_relevant(self, url: str):
+        """ Mark page domain as relevant, if max_relevant_domains is set.
+        """
         if self.max_relevant_domains:
             # Queue is relevant if it has relevant pages:
             # queue score = max(page score)

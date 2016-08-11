@@ -6,6 +6,7 @@ from typing import Iterator, List
 import autopager
 from deepdeep.predictor import LinkClassifier
 from scrapy import Spider, Request, Item
+from scrapy.exceptions import NotConfigured
 from scrapy.http.response import Response
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
@@ -76,11 +77,12 @@ class DeepDeepSpider(GeneralSpider):
     def __init__(self, clf=None, page_clf=None, **kwargs):
         if clf:  # can be empty if we just want to get queue stats
             self.link_clf = LinkClassifier.load(clf)
-        if page_clf:
-            self.page_clf = PageClassifier(page_clf)
+        self.page_clf = PageClassifier(page_clf) if page_clf else None
         super().__init__(**kwargs)
 
     def start_requests(self):
+        if not self.page_clf and self.settings.get('QUEUE_MAX_RELEVANT_DOMAINS'):
+            raise NotConfigured('Pass page_clf to spider')
         initial_priority = int(
             10 * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
         for request in super().start_requests():
@@ -103,19 +105,20 @@ class DeepDeepSpider(GeneralSpider):
 
     def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
         urls = self.link_clf.extract_urls_from_response(response)
-        page_score = self.page_score(response)
-        page_is_relevant = page_score > 0.5
-        if page_is_relevant:
-            self.queue.page_is_relevant(response.url)
+        if self.page_clf:
+            page_score = self.page_score(response)
+            threshold = self.settings.getfloat('PAGE_RELEVANCY_THRESHOLD', 0.5)
+            if page_score > threshold:
+                self.queue.page_is_relevant(response.url)
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
-            yield Request(url, priority=priority,
-                          meta={'page_is_relevant': page_is_relevant})
+            yield Request(url, priority=priority)
 
     def page_item(self, response: HtmlResponse) -> Item:
         item = super().page_item(response)
-        item['extracted_metadata']['page_score'] = self.page_score(response)
+        if self.page_clf:
+            item['extracted_metadata']['page_score'] = self.page_score(response)
         return item
 
     def response_log_item(self, response: HtmlResponse) -> List[str]:

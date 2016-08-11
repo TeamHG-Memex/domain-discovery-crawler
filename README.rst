@@ -24,18 +24,23 @@ it off completely).
 Usage
 -----
 
-Start crawl with some seeds::
+Start crawl with some seeds:::
 
     scrapy crawl deepdeep -a seeds=seeds.txt \
         -a clf=Q.joblib -a page_clf=page_clf.joblib \
         -o out/items.jl
 
-(``Q.clf`` is from deep-deep, and ``page_clf.joblib`` is from domain-discovery-eval),
-or without deep-deep::
+Start other workers without specifying seeds.
+
+``Q.clf`` is a link classifier from deep-deep,
+and ``page_clf.joblib`` is an sklearn model for page classification that takes text
+as input. ``page_clf.joblib`` is strictly required only when
+``QUEUE_MAX_RELEVANT_DOMAINS`` is set,
+but is still useful in order to check how well the crawl is going.
+
+To start a breadth-first crawl without deep-deep::
 
     scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
-
-Start other workers without specifying seeds.
 
 Settings:
 
@@ -45,11 +50,13 @@ Settings:
 - ``AUTOPAGER`` - prioritize pagination links (if not using deep-deep)
 - ``QUEUE_SCORES_LOG`` - log full queue selection process for batch softmax queue
   (written in ``.jl.gz`` format).
-- ``QUEUE_MAX_DOMAINS`` - max number of domains
+- ``QUEUE_MAX_DOMAINS`` - max number of domains (disabled due to a bug)
 - ``QUEUE_MAX_RELEVANT_DOMAINS`` - max number of relevant domains: domain is considered
   relevant if some page from that domain is considered relevant by ``page_clf``.
   Crawler drops all irrelevant domains after gathering
   the specified number of relevant ones, and does not go to new domains any more.
+- ``PAGE_RELEVANCY_THRESHOLD`` - a threshold when page (and thus the domain)
+  is considered relevant, which is used when ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
 
 For redis connection settings, refer to scrapy-redis docs.
 
@@ -62,16 +69,12 @@ run (passing extra settings as needed)::
 
     scrapy queue_stats dd_crawler -o stats.json
 
-To get a summary of response speed, set ``reponse_log`` argument, and use::
+To get a summary of response speed, set ``reponse_log`` spider argument, and use::
 
     scrapy response_stat out/*.csv
 
 You can also specify ``-o`` or ``--output`` argument to save charts to html
 file instead of showing them.
-
-
-Profiling
----------
 
 Profiling is done using `vmprof <https://vmprof.readthedocs.io>`_.
 Pass ``-a profile=basepath`` to the crawler, and then send ``SIGUSR1`` to start
