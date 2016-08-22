@@ -49,6 +49,11 @@ class GeneralSpider(Spider):
             yield Request(url=link.url)
 
     def log_response(self, response: HtmlResponse):
+        stats = self.crawler.stats
+        # To have a number of scraped items in statsd for the **current** crawl
+        # (item_scraped_count is incr-ed, so we can not use it across crawls).
+        stats.set_value('item_scraped_current_crawl',
+                        stats.get_value('item_scraped_count', 0))
         if self.response_log:
             self.response_log.writerow(self.response_log_item(response))
             self.response_log_file.flush()
