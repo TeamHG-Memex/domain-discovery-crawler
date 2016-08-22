@@ -127,27 +127,28 @@ class BaseRequestQueue(Base):
             queue_score = score
         queue_added = self.server.zadd(
             self.queues_key, **{queue_key: queue_score})
+        self.update_queue_stats(update_domains=queue_added)
         if queue_added:
             logger.debug('ADD queue {}'.format(queue_key))
         return True
 
     def pop(self, timeout=0) -> Optional[Request]:
-        self.log_queue_stats()
+        self.update_queue_stats()
         queue_key = self.select_queue_key()
         if queue_key:
             results = self.pop_from_queue(queue_key, 1)
             if results:
                 return results[0]
 
-    def log_queue_stats(self):
-        self.n_pops += 1
-        if self.n_pops % self.stat_each == 0:
-            logger.info('Queue size: {}, domains: {}{}'.format(
-                len(self),
-                self.server.zcard(self.queues_key),
-                ' relevant domains: {}'.format(
-                    self.server.scard(self.relevant_queues_key))
-                if self.max_relevant_domains else ''))
+    def update_queue_stats(self, update_domains=True):
+        stats = self.spider.crawler.stats
+        stats.set_value('dd_crawler/queue/urls', len(self))
+        if update_domains:
+            stats.set_value('dd_crawler/queue/domains',
+                            self.server.zcard(self.queues_key))
+            if self.max_relevant_domains:
+                stats.set_value('dd_crawler/queue/relevant_domains',
+                                self.server.scard(self.relevant_queues_key))
 
     def clear(self):
         keys = {self.len_key, self.queues_key, self.relevant_queues_key,
@@ -171,11 +172,7 @@ class BaseRequestQueue(Base):
             self.server.zrem(self.queues_key, *irrelevant)
             self.server.set(self.selected_relevant_key, 1)
         self.set_spider_domain_limit()
-        queues = self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
-        stats = self.spider.crawler.stats
-        stats.set_value('dd_crawler/queue/domains', len(queues))
-        stats.set_value('dd_crawler/queue/urls', len(self))
-        return queues
+        return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
 
     def set_spider_domain_limit(self):
         """ Set domain_limit attribute on the spider: it is read by middlewares
@@ -410,7 +407,7 @@ class BatchQueue(CompactQueue):
         return super().__len__() + len(self.local_queue)
 
     def pop(self, timeout=0) -> Optional[Request]:
-        self.log_queue_stats()
+        self.update_queue_stats()
         self.local_queue = self.local_queue or self.pop_multi()
         if self.local_queue:
             # TODO - take free slots into account
