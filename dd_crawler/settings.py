@@ -79,3 +79,10 @@ REACTOR_THREADPOOL_MAXSIZE = 32
 DNS_TIMEOUT = 180
 
 LOG_LEVEL = 'INFO'
+
+# Uncommend to enable collection of statsd
+# STATS_CLASS = 'scrapy_statsd.statscollectors.StatsDStatsCollector'
+# STATSD_HOST = 'localhost'
+# STATSD_PORT = 80125
+import socket
+STATSD_PREFIX = socket.gethostname().replace('.', '-')

@@ -7,6 +7,6 @@ scrapy-cdr
 tldextract
 vmprof
 statsd
-git+https://github.com/lopuhin/scrapy-statsd.git@py3
+git+https://github.com/lopuhin/scrapy-statsd.git@ops
 git+https://github.com/lopuhin/scrapy-redis.git@py3
 #git+https://github.com:/eamHG-Memex/deep-deep.git@dd-crawler-integration

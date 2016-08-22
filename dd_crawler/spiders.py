@@ -114,6 +114,7 @@ class DeepDeepSpider(GeneralSpider):
         if self.page_clf:
             page_score = self.page_score(response)
             if self.statsd_client:
+                print('send timing', self.statsd_client)
                 self.statsd_client.timing(
                     'dd_crawler.page_score', 1000 * page_score)
             threshold = self.settings.getfloat('PAGE_RELEVANCY_THRESHOLD', 0.5)
@@ -127,11 +128,12 @@ class DeepDeepSpider(GeneralSpider):
     @property
     def statsd_client(self):
         if not hasattr(self, '_statsd_client'):
-            statsd_host = self.settings.get('STATSD_HOST')
-            if statsd_host:
+            s = self.settings
+            if 'StatsDStatsCollector' in s.get('STATS_CLASS', ''):
                 self._statsd_client = statsd.StatsClient(
-                    host=statsd_host,
-                    port=self.settings.getint('STATSD_PORT', 8125))
+                    host=s.get('STATSD_HOST', 'localhost'),
+                    port=s.getint('STATSD_PORT', 8125),
+                    prefix=s.get('STATSD_PREFIX', None))
             else:
                 self._statsd_client = None
         return self._statsd_client
