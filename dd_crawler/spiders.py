@@ -11,6 +11,7 @@ from scrapy.http.response import Response
 from scrapy.http.response.html import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
+import statsd
 
 from .utils import dont_increase_depth, setup_profiling, PageClassifier
 
@@ -107,6 +108,9 @@ class DeepDeepSpider(GeneralSpider):
         urls = self.link_clf.extract_urls_from_response(response)
         if self.page_clf:
             page_score = self.page_score(response)
+            if self.statsd_client:
+                self.statsd_client.timing(
+                    'dd_crawler.page_score', 1000 * page_score)
             threshold = self.settings.getfloat('PAGE_RELEVANCY_THRESHOLD', 0.5)
             if page_score > threshold:
                 self.queue.page_is_relevant(response.url)
@@ -114,6 +118,18 @@ class DeepDeepSpider(GeneralSpider):
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
             yield Request(url, priority=priority)
+
+    @property
+    def statsd_client(self):
+        if not hasattr(self, '_statsd_client'):
+            statsd_host = self.settings.get('STATSD_HOST')
+            if statsd_host:
+                self._statsd_client = statsd.StatsClient(
+                    host=statsd_host,
+                    port=self.settings.getint('STATSD_PORT', 8125))
+            else:
+                self._statsd_client = None
+        return self._statsd_client
 
     def page_item(self, response: HtmlResponse) -> Item:
         item = super().page_item(response)

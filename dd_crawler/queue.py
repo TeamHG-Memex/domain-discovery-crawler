@@ -171,7 +171,11 @@ class BaseRequestQueue(Base):
             self.server.zrem(self.queues_key, *irrelevant)
             self.server.set(self.selected_relevant_key, 1)
         self.set_spider_domain_limit()
-        return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
+        queues = self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
+        stats = self.spider.crawler.stats
+        stats.set_value('dd_crawler/queue/domains', len(queues))
+        stats.set_value('dd_crawler/queue/urls', len(self))
+        return queues
 
     def set_spider_domain_limit(self):
         """ Set domain_limit attribute on the spider: it is read by middlewares

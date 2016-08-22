@@ -57,6 +57,10 @@ Settings:
   the specified number of relevant ones, and does not go to new domains any more.
 - ``PAGE_RELEVANCY_THRESHOLD`` - a threshold when page (and thus the domain)
   is considered relevant, which is used when ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
+- ``STATS_CLASS`` - set to ``'scrapy_statsd.statscollectors.StatsDStatsCollector'``
+  in order to push scrapy stats to statsd for spider monitoring.
+  Set ``STATSD_HOST`` and, optionally, ``STATSD_PORT``.
+
 
 For redis connection settings, refer to scrapy-redis docs.
 
