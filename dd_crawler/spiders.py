@@ -114,7 +114,6 @@ class DeepDeepSpider(GeneralSpider):
         if self.page_clf:
             page_score = self.page_score(response)
             if self.statsd_client:
-                print('send timing', self.statsd_client)
                 self.statsd_client.timing(
                     'dd_crawler.page_score', 1000 * page_score)
             threshold = self.settings.getfloat('PAGE_RELEVANCY_THRESHOLD', 0.5)
