@@ -1,6 +1,4 @@
-import csv
 from functools import lru_cache
-import time
 from typing import Iterator, List
 
 import autopager
@@ -19,7 +17,7 @@ from .utils import dont_increase_depth, setup_profiling, PageClassifier
 class GeneralSpider(Spider):
     name = 'dd_crawler'
 
-    def __init__(self, seeds=None, profile=None, response_log=None):
+    def __init__(self, seeds=None, profile=None):
         super().__init__()
         self.le = LinkExtractor(canonicalize=False)
         if seeds:
@@ -27,18 +25,17 @@ class GeneralSpider(Spider):
                 self.start_urls = [line.strip() for line in f]
         if profile:
             setup_profiling(profile)
-        if response_log:
-            self.response_log_file = open(response_log, 'a')
-            self.response_log = csv.writer(self.response_log_file)
-        else:
-            self.response_log = None
 
     def parse(self, response: Response):
         if not isinstance(response, HtmlResponse):
             return
         yield from self.extract_urls(response)
         yield self.page_item(response)
-        self.log_response(response)
+        stats = self.crawler.stats
+        # To have a number of scraped items in statsd for the **current** crawl
+        # (item_scraped_count is incr-ed, so we can not use it across crawls).
+        stats.set_value('item_scraped_current_crawl',
+                        stats.get_value('item_scraped_count', 0))
 
     def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
         if self.settings.getbool('AUTOPAGER'):
@@ -47,23 +44,6 @@ class GeneralSpider(Spider):
                     yield Request(url=url)
         for link in self.le.extract_links(response):
             yield Request(url=link.url)
-
-    def log_response(self, response: HtmlResponse):
-        stats = self.crawler.stats
-        # To have a number of scraped items in statsd for the **current** crawl
-        # (item_scraped_count is incr-ed, so we can not use it across crawls).
-        stats.set_value('item_scraped_current_crawl',
-                        stats.get_value('item_scraped_count', 0))
-        if self.response_log:
-            self.response_log.writerow(self.response_log_item(response))
-            self.response_log_file.flush()
-
-    def response_log_item(self, response: HtmlResponse) -> List[str]:
-        return ['{:.3f}'.format(time.time()),
-                response.url,
-                str(response.meta.get('depth', '')),
-                str(response.request.priority),
-                ]
 
     def page_item(self, response: HtmlResponse) -> Item:
         return text_cdr_item(
@@ -141,9 +121,4 @@ class DeepDeepSpider(GeneralSpider):
         item = super().page_item(response)
         if self.page_clf:
             item['extracted_metadata']['page_score'] = self.page_score(response)
-        return item
-
-    def response_log_item(self, response: HtmlResponse) -> List[str]:
-        item = super().response_log_item(response)
-        item.append(str(self.page_score(response)))
         return item

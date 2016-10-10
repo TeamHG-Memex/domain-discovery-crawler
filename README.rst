@@ -60,8 +60,8 @@ Settings:
 - ``STATS_CLASS`` - set to ``'scrapy_statsd.statscollectors.StatsDStatsCollector'``
   in order to push scrapy stats to statsd for spider monitoring.
   Set ``STATSD_HOST`` and, optionally, ``STATSD_PORT``.
-- ``SPIDER_STATS_PATH`` - path to spider stats log in JSON-lines format
-  (number of requests, domains, relevant domains, average score).
+- ``RESPONSE_LOG_FILE`` - path to spider stats log in csv format
+  (see ``dd_crawler.middleware.log.RequestLogMiddleware.log_item``).
 
 
 For redis connection settings, refer to scrapy-redis docs.
@@ -75,7 +75,7 @@ run (passing extra settings as needed)::
 
     scrapy queue_stats dd_crawler -o stats.json
 
-To get a summary of response speed, set ``reponse_log`` spider argument, and use::
+To get a summary of response speed, set ``RESPONSE_LOG_FILE`` setting, and use::
 
     scrapy response_stat out/*.csv
 
