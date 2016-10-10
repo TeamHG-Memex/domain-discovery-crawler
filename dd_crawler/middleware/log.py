@@ -32,7 +32,7 @@ class RequestLogMiddleware:
         for item in result:
             if isinstance(item, CDRItem):
                 self.log_item(item, response)
-                yield item
+            yield item
 
     def log_item(self, item: CDRItem, response: HtmlResponse):
         self.n_crawled += 1
