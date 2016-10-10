@@ -45,6 +45,7 @@ MAX_DUPLICATE_QUERY_SEGMENTS = 3
 
 SPIDER_MIDDLEWARES = {
     'dd_crawler.middleware.domains.DomainControlMiddleware': 550,
+    'dd_crawler.middleware.stats.SpiderStatsMiddleware': 600,
     'dd_crawler.middleware.dupesegments.DupeSegmentsMiddleware': 750,
 }
 

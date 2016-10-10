@@ -60,6 +60,8 @@ Settings:
 - ``STATS_CLASS`` - set to ``'scrapy_statsd.statscollectors.StatsDStatsCollector'``
   in order to push scrapy stats to statsd for spider monitoring.
   Set ``STATSD_HOST`` and, optionally, ``STATSD_PORT``.
+- ``SPIDER_STATS_PATH`` - path to spider stats log in JSON-lines format
+  (number of requests, domains, relevant domains, average score).
 
 
 For redis connection settings, refer to scrapy-redis docs.
