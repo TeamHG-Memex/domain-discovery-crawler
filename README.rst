@@ -33,7 +33,9 @@ Start crawl with some seeds:::
 Start other workers without specifying seeds.
 
 ``Q.clf`` is a link classifier from deep-deep,
-and ``page_clf.joblib`` is an sklearn model for page classification that takes text
+and ``page_clf.joblib`` is an sklearn model for page classification that takes
+text (if ``classifier_input`` spider argument is at deafult ``text`` value)
+or dict with "text" and "url" keys (if ``classifier_input`` is ``text_url``)
 as input. ``page_clf.joblib`` is strictly required only when
 ``QUEUE_MAX_RELEVANT_DOMAINS`` is set,
 but is still useful in order to check how well the crawl is going.

@@ -73,8 +73,18 @@ def _get_prof_filename(profile: str) -> str:
 
 
 class PageClassifier:
-    def __init__(self, clf_filename):
+    def __init__(self, clf_filename, classifier_input):
         self.clf = joblib.load(clf_filename)
+        if classifier_input not in {'text', 'text_url'}:
+            raise ValueError(
+                'Invalid classifier_input value: {}'.format(classifier_input))
+        self.classifier_input = classifier_input
 
-    def get_score(self, html: str) -> float:
-        return self.clf.predict_proba([html2text(html)])[0][1]
+    def get_score(self, html: str, url: str) -> float:
+        if self.classifier_input == 'text':
+            x = html2text(html)
+        elif self.classifier_input == 'text_url':
+            x = {'text': html2text(html), 'url': url}
+        else:
+            raise RuntimeError
+        return self.clf.predict_proba([x])[0][1]

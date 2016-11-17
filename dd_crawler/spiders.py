@@ -60,10 +60,12 @@ class GeneralSpider(Spider):
 class DeepDeepSpider(GeneralSpider):
     name = 'deepdeep'
 
-    def __init__(self, clf=None, page_clf=None, **kwargs):
+    def __init__(self, clf=None, page_clf=None, classifier_input='text',
+                 **kwargs):
         if clf:  # can be empty if we just want to get queue stats
             self.link_clf = LinkClassifier.load(clf)
-        self.page_clf = PageClassifier(page_clf) if page_clf else None
+        self.page_clf = PageClassifier(
+            page_clf, classifier_input=classifier_input) if page_clf else None
         super().__init__(**kwargs)
 
     def start_requests(self):
@@ -80,7 +82,7 @@ class DeepDeepSpider(GeneralSpider):
 
     @lru_cache(maxsize=1)
     def page_score(self, response: HtmlResponse) -> float:
-        return self.page_clf.get_score(response.text)
+        return self.page_clf.get_score(html=response.text, url=response.url)
 
     @property
     def queue(self):
