@@ -87,4 +87,4 @@ class PageClassifier:
             x = {'text': html2text(html), 'url': url}
         else:
             raise RuntimeError
-        return self.clf.predict_proba([x])[0][1]
+        return float(self.clf.predict_proba([x])[0][1])
