@@ -1,14 +1,14 @@
 autopager
 bokeh==0.12
-numpy==1.11.1
-scikit-learn==0.18
+numpy==1.12.1
+scikit-learn==0.18.1
 scipy==0.18.1
 pandas
-scrapy==1.1.1
+scrapy==1.4.0
 scrapy-cdr
 tldextract
 vmprof
 statsd
-git+https://github.com/lopuhin/scrapy-statsd.git@ops
+git+https://github.com/TeamHG-Memex/scrapy-statsd.git@ops
 git+https://github.com/lopuhin/scrapy-redis.git@py3
-#git+https://github.com:/TeamHG-Memex/deep-deep.git
+# deep-deep
