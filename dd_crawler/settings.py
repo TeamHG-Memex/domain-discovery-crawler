@@ -36,6 +36,7 @@ REDIRECT_PRIORITY_ADJUST = 1
 DEPTH_PRIORITY = 1
 
 DOWNLOADER_MIDDLEWARES = {
+    'proxy_middleware.ProxyOnlyTorMiddleware': 10,
     'scrapy.downloadermiddlewares.redirect.RedirectMiddleware': None,
     'dd_crawler.middleware.domains.ForbidOffsiteRedirectsMiddleware': 600,
 }

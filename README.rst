@@ -64,6 +64,8 @@ Settings:
   Set ``STATSD_HOST`` and, optionally, ``STATSD_PORT``.
 - ``RESPONSE_LOG_FILE`` - path to spider stats log in csv format
   (see ``dd_crawler.middleware.log.RequestLogMiddleware.log_item``).
+- ``HTTP_PROXY``, ``HTTPS_PROXY``: set to enable onion crawling via given proxy.
+  The proxy will be used only for domains ending with ".onion".
 
 
 For redis connection settings, refer to scrapy-redis docs.

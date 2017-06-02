@@ -11,4 +11,5 @@ vmprof
 statsd
 git+https://github.com/TeamHG-Memex/scrapy-statsd.git@ops
 git+https://github.com/lopuhin/scrapy-redis.git@py3
+proxy-middleware
 # deep-deep
