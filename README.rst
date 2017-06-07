@@ -24,7 +24,7 @@ it off completely).
 Usage
 -----
 
-Start crawl with some seeds:::
+Start crawl with some seeds::
 
     scrapy crawl deepdeep -a seeds=seeds.txt \
         -a clf=Q.joblib -a page_clf=page_clf.joblib \

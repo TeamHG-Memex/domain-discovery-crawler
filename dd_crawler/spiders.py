@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Iterator, List
+from typing import Iterator
 
 import autopager
 from deepdeep.predictor import LinkClassifier
