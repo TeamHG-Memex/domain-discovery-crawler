@@ -131,17 +131,12 @@ written to ``./out/${hostname}_N.vmprof``. An example::
     kill -10 `ps aux | grep scrapy | grep -v grep | awk '{print $2}'`
 
 
-Docker system setup on Ubuntu 14.04
+Docker system setup on Ubuntu 16.04
 -----------------------------------
 
 Install docker engine::
 
-    sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 \
-                     --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
-    echo "deb https://apt.dockerproject.org/repo ubuntu-trusty main" \
-      | sudo tee /etc/apt/sources.list.d/docker.list
-    sudo apt-get update
-    sudo apt-get install docker-engine
+    sudo apt-get install docker.io
 
 Add yourself to the docker group (optional, requires re-login)::
 
