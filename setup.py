@@ -7,10 +7,12 @@ setup(
     install_requires=[
         'autopager',
         # 'deepdeep',
+        'html_text>=0.2.1',
         'numpy',
-        'scrapy>=1.1.0',
         'scrapy-cdr',
-        'scrapy-redis',
+        'scrapy-redis>=0.6.8',
+        'scrapy>=1.1.0',
+        'tldextract',
         'vmprof',
     ],
 )

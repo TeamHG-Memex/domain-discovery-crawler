@@ -1,3 +1,4 @@
+import base64
 from collections import Counter
 from functools import lru_cache
 import gzip
@@ -349,6 +350,17 @@ class BaseRequestQueue(Base):
                 (name.decode('utf8'), -score, self.server.zcard(name))
                 for name, score in queues],
         )
+
+    # This _encode_request and _decode_request are used only in tests,
+    # they are overriden in CompactQueue for production use.
+
+    def _encode_request(self, request) -> str:
+        data = super()._encode_request(request)
+        return base64.b64encode(data).decode('ascii')
+
+    def _decode_request(self, encoded_request: str):
+        encoded_request = base64.b64decode(encoded_request)
+        return super()._decode_request(encoded_request)
 
 
 class CompactQueue(BaseRequestQueue):

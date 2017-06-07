@@ -6,7 +6,7 @@ import signal
 import time
 from urllib.parse import urlsplit
 
-from deepdeep.utils import html2text
+import html_text
 from sklearn.externals import joblib
 import vmprof
 
@@ -82,9 +82,9 @@ class PageClassifier:
 
     def get_score(self, html: str, url: str) -> float:
         if self.classifier_input == 'text':
-            x = html2text(html)
+            x = html_text.extract_text(html)
         elif self.classifier_input == 'text_url':
-            x = {'text': html2text(html), 'url': url}
+            x = {'text': html_text.extract_text(html), 'url': url}
         else:
             raise RuntimeError
         return float(self.clf.predict_proba([x])[0][1])
