@@ -7,7 +7,7 @@ import redis
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy.utils.log import configure_logging
-from scrapy_redis.scheduler import QUEUE_KEY
+from scrapy_redis.defaults import SCHEDULER_QUEUE_KEY as QUEUE_KEY
 
 from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue, \
     BatchSoftmaxQueue
