@@ -13,7 +13,8 @@ USER_AGENT = (
 
 # Scrapy-redis settings
 # Enables scheduling storing requests queue in redis.
-SCHEDULER = "scrapy_redis.scheduler.Scheduler"
+SCHEDULER = 'scrapy_redis.scheduler.Scheduler'
+DUPEFILTER_CLASS = 'scrapy_redis.dupefilter.RFPDupeFilter'
 # Don't cleanup redis queues, allows to pause/resume crawls.
 SCHEDULER_PERSIST = True
 # SCHEDULER_QUEUE_CLASS = 'dd_crawler.queue.CompactQueue'

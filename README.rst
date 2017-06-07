@@ -28,7 +28,7 @@ Start crawl with some seeds::
 
     scrapy crawl deepdeep -a seeds=seeds.txt \
         -a clf=Q.joblib -a page_clf=page_clf.joblib \
-        -o out/items.jl
+        -o gzip:out/items.jl
 
 Start other workers without specifying seeds.
 
