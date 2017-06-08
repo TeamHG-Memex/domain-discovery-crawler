@@ -74,12 +74,13 @@ class BaseRequestQueue(Base):
     """
     def __init__(self, *args, slots_mock=None, skip_cache=False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.len_key = '{}:len'.format(self.key)  # redis int
-        self.queues_key = '{}:queues'.format(self.key)  # redis sorted set
-        self.relevant_queues_key = '{}:relevant-queues'.format(self.key)  # set
-        self.selected_relevant_key = '{}:selected-relevant'.format(self.key)  # redis int
-        self.workers_key = '{}:workers'.format(self.key)  # redis set
-        self.worker_id_key = '{}:worker-id'.format(self.key)  # redis int
+        key = lambda s: '{}:{}'.format(s, self.key)
+        self.len_key = key('len')  # int
+        self.queues_key = key('queues')  # sorted set
+        self.relevant_queues_key = key('relevant-queues')  # set
+        self.selected_relevant_key = key('selected-relevant')  # int
+        self.workers_key = key('workers')  # set
+        self.worker_id_key = key('worker-id')  # int
         self.worker_id = self.server.incr(self.worker_id_key)
         self.alive_timeout = 120  # seconds
         self.im_alive()
