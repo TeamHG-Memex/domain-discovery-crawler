@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import List
 from urllib.parse import urlsplit
@@ -40,7 +41,8 @@ def queue_cls(request):
 logging_configured = False
 
 
-def make_queue(redis_server, cls, slots=None, skip_cache=True, settings=None):
+def make_queue(redis_server, cls: type, slots=None, skip_cache=True, settings=None
+               ) -> BaseRequestQueue:
     global logging_configured
     if not logging_configured:
         configure_logging(settings=settings)
@@ -100,13 +102,14 @@ def test_max_domains(server, queue_cls):
 
 def test_max_relevant_domains(server, queue_cls):
     q = make_queue(server, queue_cls,
-                   settings={'QUEUE_MAX_RELEVANT_DOMAINS': 2})
+                   settings={'QUEUE_MAX_RELEVANT_DOMAINS': 2,
+                             'RESTRICT_DELAY': 0})
     assert q.push(Request('http://domain-1.com'))
-    q.page_is_relevant('http://domain-1.com')
+    q.page_is_relevant('http://domain-1.com', 1)
     assert q.push(Request('http://domain-2.com'))
     assert q.push(Request('http://domain-3.com/foo'))
     assert q.push(Request('http://domain-2.com/foo'))
-    q.page_is_relevant('http://domain-2.com/foo')
+    q.page_is_relevant('http://domain-2.com/foo', 1)
     assert q.push(Request('http://domain-1.com/foo'))
     # did not pop yet, so can push a new domain
     assert q.push(Request('http://domain-4.com/foo'))

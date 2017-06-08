@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Iterator
+from typing import Iterator, Optional
 
 import autopager
 from deepdeep.predictor import LinkClassifier
@@ -11,6 +11,7 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
 import statsd
 
+from .queue import BaseRequestQueue
 from .utils import dont_increase_depth, setup_profiling, PageClassifier
 
 
@@ -85,7 +86,7 @@ class DeepDeepSpider(GeneralSpider):
         return self.page_clf.get_score(html=response.text, url=response.url)
 
     @property
-    def queue(self):
+    def queue(self) -> Optional[BaseRequestQueue]:
         try:
             return self.crawler.engine.slot.scheduler.queue
         except AttributeError:
@@ -100,7 +101,7 @@ class DeepDeepSpider(GeneralSpider):
                     'dd_crawler.page_score', 1000 * page_score)
             threshold = self.settings.getfloat('PAGE_RELEVANCY_THRESHOLD', 0.5)
             if page_score > threshold:
-                self.queue.page_is_relevant(response.url)
+                self.queue.page_is_relevant(response.url, page_score)
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
