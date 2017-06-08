@@ -119,7 +119,6 @@ class BaseRequestQueue(Base):
                                 self.server.zcard(self.relevant_queues_key))
 
     def clear(self):
-        print('clear')
         logging.info('Clearing all keys for {}'.format(self.key))
         keys = {self.len_key, self.queues_key, self.relevant_queues_key,
                 self.did_restrict_key, self.workers_key, self.worker_id_key,
@@ -129,8 +128,13 @@ class BaseRequestQueue(Base):
         self.server.delete(*keys)
         super().clear()
 
-    def get_queues(self, withscores=False) \
-            -> Union[List[bytes], List[Tuple[bytes, float]]]:
+    def get_queues(self, withscores=False
+                   ) -> Union[List[bytes], List[Tuple[bytes, float]]]:
+        self.try_to_restrict_domains()
+        self.set_spider_domain_limit()
+        return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
+
+    def try_to_restrict_domains(self):
         if (self.restrict_domanis
             and not self.did_restrict_domains
             and time.time() - self.start_time > self.restrict_delay
@@ -142,7 +146,7 @@ class BaseRequestQueue(Base):
             n_hints = len(selected_relevant)
             if self.max_relevant_domains > 0:
                 selected_relevant.update(self.server.zrange(
-                    self.relevant_queues_key, 0, self.max_relevant_domains))
+                    self.relevant_queues_key, 0, self.max_relevant_domains - 1))
             irrelevant = (set(self.server.zrange(self.queues_key, 0, -1)) -
                           selected_relevant)
             logger.info(
@@ -151,8 +155,6 @@ class BaseRequestQueue(Base):
                 .format(len(irrelevant), len(selected_relevant), n_hints))
             self.server.zrem(self.queues_key, *irrelevant)
             self.server.set(self.did_restrict_key, b'1')
-        self.set_spider_domain_limit()
-        return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
 
     def set_spider_domain_limit(self):
         """ Set domain_limit attribute on the spider: it is read by middlewares
@@ -172,7 +174,7 @@ class BaseRequestQueue(Base):
         """
         if self.max_relevant_domains:
             queue_key = self.url_queue_key(url)
-            self.server.zincrby(self.relevant_queues_key, queue_key, score)
+            self.server.zincrby(self.relevant_queues_key, queue_key, -score)
 
     def get_workers(self) -> List[bytes]:
         return self.server.smembers(self.workers_key)

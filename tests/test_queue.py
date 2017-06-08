@@ -1,5 +1,5 @@
-import logging
 import os
+import time
 from typing import List
 from urllib.parse import urlsplit
 
@@ -102,20 +102,25 @@ def test_max_domains(server, queue_cls):
 
 def test_max_relevant_domains(server, queue_cls):
     q = make_queue(server, queue_cls,
-                   settings={'QUEUE_MAX_RELEVANT_DOMAINS': 2,
-                             'RESTRICT_DELAY': 0})
+                   settings={'QUEUE_MAX_RELEVANT_DOMAINS': 2, 'RESTRICT_DELAY': 1})
     assert q.push(Request('http://domain-1.com'))
-    q.page_is_relevant('http://domain-1.com', 1)
+    q.page_is_relevant('http://domain-1.com', 1.1)
     assert q.push(Request('http://domain-2.com'))
+    q.page_is_relevant('http://domain-2.com', 0.6)
     assert q.push(Request('http://domain-3.com/foo'))
+    q.page_is_relevant('http://domain-3.com/foo', 1)
     assert q.push(Request('http://domain-2.com/foo'))
-    q.page_is_relevant('http://domain-2.com/foo', 1)
+    q.page_is_relevant('http://domain-2.com/foo', 0.6)
     assert q.push(Request('http://domain-1.com/foo'))
+    q.try_to_restrict_domains()  # too early
+    assert not q.did_restrict_domains
     # did not pop yet, so can push a new domain
     assert q.push(Request('http://domain-4.com/foo'))
+    time.sleep(1)
     urls = set()
     while True:
         r = q.pop()
+        assert q.did_restrict_domains
         if r is None:
             break
         urls.add(r.url)
