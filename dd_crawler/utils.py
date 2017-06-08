@@ -1,4 +1,5 @@
 import contextlib
+from functools import lru_cache
 import logging
 import re
 import os.path
@@ -27,6 +28,42 @@ def warn_if_slower(limit, logger):
                         fn.__name__, took))
         return inner
     return deco
+
+
+def cacheforawhile(method):
+    """ Cache method for some time, so that it does not become a bottleneck.
+    """
+    max_cache_time = 30 * 60  # seconds
+    run_time_multiplier = 20
+    last_call_time = None
+    initial_cache_time = 0.5  # seconds
+    cache_time = initial_cache_time
+
+    @lru_cache(maxsize=1)
+    def cached_method(*args, **kwargs):
+        nonlocal cache_time
+        kwargs.pop('time_key')
+        t0 = time.time()
+        try:
+            return method(*args, **kwargs)
+        finally:
+            run_time = time.time() - t0
+            cache_time = min(max_cache_time, run_time * run_time_multiplier)
+            if cache_time > initial_cache_time:
+                logger.info('{} took {:.2f} s, new cache time is {:.1f} s'
+                            .format(method.__name__, run_time, cache_time))
+
+    def inner(self, *args, **kwargs):
+        if self.skip_cache:
+            return method(self, *args, **kwargs)
+        nonlocal last_call_time
+        t = time.time()
+        if not last_call_time or (t - last_call_time > cache_time):
+            last_call_time = t
+        kwargs['time_key'] = last_call_time
+        return cached_method(self, *args, **kwargs)
+
+    return inner
 
 
 def get_domain(url):
