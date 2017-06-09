@@ -106,11 +106,11 @@ def test_max_relevant_domains(server, queue_cls):
     assert q.push(Request('http://domain-1.com'))
     q.page_is_relevant('http://domain-1.com', 1.1)
     assert q.push(Request('http://domain-2.com'))
-    q.page_is_relevant('http://domain-2.com', 0.6)
+    q.page_is_relevant('http://domain-2.com', 0.8)
     assert q.push(Request('http://domain-3.com/foo'))
     q.page_is_relevant('http://domain-3.com/foo', 1)
     assert q.push(Request('http://domain-2.com/foo'))
-    q.page_is_relevant('http://domain-2.com/foo', 0.6)
+    q.page_is_relevant('http://domain-2.com/foo', 0.8)
     assert q.push(Request('http://domain-1.com/foo'))
     q.try_to_restrict_domains()  # too early
     assert not q.did_restrict_domains

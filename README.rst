@@ -56,7 +56,12 @@ Settings:
 - ``QUEUE_MAX_RELEVANT_DOMAINS`` - max number of relevant domains: domain is considered
   relevant if some page from that domain is considered relevant by ``page_clf``.
   Crawler drops all irrelevant domains after gathering
-  the specified number of relevant ones, and does not go to new domains any more.
+  the specified number of relevant ones (but not earlier than
+  ``RESTRICT_DELAY``, 1 hour by default), and does not go to new domains any more.
+  If more relevant domains were discovered before ``RESTRICT_DELAY``, most
+  relevant are selected accoring to sum of squares of relevant page scores.
+  If ``QUEUE_MAX_RELEVANT_DOMAINS``, only hints (see below) are left after
+  ``RESTRICT_DELAY``.
 - ``PAGE_RELEVANCY_THRESHOLD`` - a threshold when page (and thus the domain)
   is considered relevant, which is used when ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
 - ``STATS_CLASS`` - set to ``'scrapy_statsd.statscollectors.StatsDStatsCollector'``
@@ -67,6 +72,11 @@ Settings:
 - ``HTTP_PROXY``, ``HTTPS_PROXY``: set to enable onion crawling via given proxy.
   The proxy will be used only for domains ending with ".onion".
 
+When ``QUEUE_MAX_RELEVANT_DOMAINS`` is defined (even if it's zero),
+hints are also taken into account.
+They are stored as utf8-encoded urls in ``BaseRequestQueue.hints_key`` redis set.
+After broad crawling for ``RESTRICT_DELAY`` seconds, only hints and
+top ``QUEUE_MAX_RELEVANT_DOMAINS`` domains are crawled.
 
 For redis connection settings, refer to scrapy-redis docs.
 

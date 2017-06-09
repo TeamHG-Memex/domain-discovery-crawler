@@ -174,7 +174,7 @@ class BaseRequestQueue(Base):
         """
         if self.max_relevant_domains:
             queue_key = self.url_queue_key(url)
-            self.server.zincrby(self.relevant_queues_key, queue_key, -score)
+            self.server.zincrby(self.relevant_queues_key, queue_key, -score**2)
 
     def get_workers(self) -> List[bytes]:
         return self.server.smembers(self.workers_key)
