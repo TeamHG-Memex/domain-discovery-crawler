@@ -143,6 +143,27 @@ def test_only_hints(server, queue_cls):
     assert q.did_restrict_domains
 
 
+def test_hints_with_top(server, queue_cls):
+    q = make_queue(server, queue_cls,
+                   settings={'QUEUE_MAX_RELEVANT_DOMAINS': 1, 'RESTRICT_DELAY': 0})
+    assert q.push(Request('http://domain-2.com/foo'))
+    q.page_is_relevant('http://domain-2.com/foo', 1)
+    assert q.push(Request('http://domain-1.com/foo'))
+    q.page_is_relevant('http://domain-3.com/foo', 0.4)
+    server.sadd(q.hints_key, 'http://domain-3.com')
+    assert q.push(Request('http://domain-3.com/foo'))
+    q.page_is_relevant('http://domain-3.com/foo', 0.5)
+    assert not q.did_restrict_domains
+    urls = set()
+    while True:
+        r = q.pop()
+        assert q.did_restrict_domains
+        if r is None:
+            break
+        urls.add(r.url)
+    assert urls == {'http://domain-2.com/foo', 'http://domain-3.com/foo'}
+
+
 def test_priority(server, queue_cls):
     q = make_queue(server, queue_cls)
     q.push(Request('http://example.com/1', priority=10))
