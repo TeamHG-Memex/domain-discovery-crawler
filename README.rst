@@ -24,7 +24,7 @@ it off completely).
 Usage
 -----
 
-Start crawl with some seeds::
+Start focused crawl with some seeds::
 
     scrapy crawl deepdeep -a seeds=seeds.txt \
         -a clf=Q.joblib -a page_clf=page_clf.joblib \
@@ -32,17 +32,19 @@ Start crawl with some seeds::
 
 Start other workers without specifying seeds.
 
-``Q.clf`` is a link classifier from deep-deep,
-and ``page_clf.joblib`` is an sklearn model for page classification that takes
-text (if ``classifier_input`` spider argument is at deafult ``text`` value)
-or dict with "text" and "url" keys (if ``classifier_input`` is ``text_url``)
-as input. ``page_clf.joblib`` is strictly required only when
-``QUEUE_MAX_RELEVANT_DOMAINS`` is set,
-but is still useful in order to check how well the crawl is going.
+Arguments:
 
-To start a breadth-first crawl without deep-deep::
-
-    scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
+- ``seeds``: a text file with seed urls, one url on a line.
+- ``clf``: Q-model (link classifier) from deep-deep.
+- ``page_clf`` (optional): page classifier: must take text or a dict with
+  "text" and "url" keys as input, and return page score (probability of the
+  page being relevant). This argument is required if ``QUEUE_MAX_RELEVANT_DOMAINS``
+  is set, but is useful even without it,
+  in order to check how well the crawl is going.
+- ``classifier_input`` (optiona, default is ``text``):
+  should be ``text`` if ``page_clf`` takes text as input,
+  or ``text_url`` if ``page_clf`` takes a dict with "text" and "url" keys
+  as input.
 
 Settings:
 
@@ -80,9 +82,13 @@ top ``QUEUE_MAX_RELEVANT_DOMAINS`` domains are crawled.
 
 For redis connection settings, refer to scrapy-redis docs.
 
+To start a breadth-first crawl without deep-deep::
+
+    scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
+
 To export items to a .gz archive use ``gzip:`` scheme::
 
-    scrapy crawl dd_crawler -a seeds=seeds.txt -o gzip:out/items.jl
+    scrapy crawl... -o gzip:out/items.jl
 
 To get a summary of queue stats and export full stats to json,
 run (passing extra settings as needed)::
