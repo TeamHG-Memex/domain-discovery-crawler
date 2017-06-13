@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Iterator
+from typing import Iterator, Optional
 
 import autopager
 from deepdeep.predictor import LinkClassifier
@@ -11,6 +11,7 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy_cdr.utils import text_cdr_item
 import statsd
 
+from .queue import BaseRequestQueue
 from .utils import dont_increase_depth, setup_profiling, PageClassifier
 
 
@@ -60,12 +61,15 @@ class GeneralSpider(Spider):
 class DeepDeepSpider(GeneralSpider):
     name = 'deepdeep'
 
-    def __init__(self, clf=None, page_clf=None, classifier_input='text',
+    def __init__(self, clf=None, page_clf=None, classifier_input='text', hints=None,
                  **kwargs):
         if clf:  # can be empty if we just want to get queue stats
             self.link_clf = LinkClassifier.load(clf)
         self.page_clf = PageClassifier(
             page_clf, classifier_input=classifier_input) if page_clf else None
+        if hints:
+            with open(hints) as f:
+                self.hint_urls = [line.strip() for line in f]
         super().__init__(**kwargs)
 
     def start_requests(self):
@@ -85,7 +89,7 @@ class DeepDeepSpider(GeneralSpider):
         return self.page_clf.get_score(html=response.text, url=response.url)
 
     @property
-    def queue(self):
+    def queue(self) -> Optional[BaseRequestQueue]:
         try:
             return self.crawler.engine.slot.scheduler.queue
         except AttributeError:
@@ -100,7 +104,7 @@ class DeepDeepSpider(GeneralSpider):
                     'dd_crawler.page_score', 1000 * page_score)
             threshold = self.settings.getfloat('PAGE_RELEVANCY_THRESHOLD', 0.5)
             if page_score > threshold:
-                self.queue.page_is_relevant(response.url)
+                self.queue.page_is_relevant(response.url, page_score)
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))

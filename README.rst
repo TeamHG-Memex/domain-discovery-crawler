@@ -24,7 +24,7 @@ it off completely).
 Usage
 -----
 
-Start crawl with some seeds::
+Start focused crawl with some seeds::
 
     scrapy crawl deepdeep -a seeds=seeds.txt \
         -a clf=Q.joblib -a page_clf=page_clf.joblib \
@@ -32,17 +32,21 @@ Start crawl with some seeds::
 
 Start other workers without specifying seeds.
 
-``Q.clf`` is a link classifier from deep-deep,
-and ``page_clf.joblib`` is an sklearn model for page classification that takes
-text (if ``classifier_input`` spider argument is at deafult ``text`` value)
-or dict with "text" and "url" keys (if ``classifier_input`` is ``text_url``)
-as input. ``page_clf.joblib`` is strictly required only when
-``QUEUE_MAX_RELEVANT_DOMAINS`` is set,
-but is still useful in order to check how well the crawl is going.
+Arguments:
 
-To start a breadth-first crawl without deep-deep::
-
-    scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
+- ``seeds``: a text file with seed urls, one url on a line.
+- ``clf``: Q-model (link classifier) from deep-deep.
+- ``page_clf`` (optional): page classifier: must take text or a dict with
+  "text" and "url" keys as input, and return page score (probability of the
+  page being relevant). This argument is required if ``QUEUE_MAX_RELEVANT_DOMAINS``
+  is set, but is useful even without it,
+  in order to check how well the crawl is going.
+- ``classifier_input`` (optiona, default is ``text``):
+  should be ``text`` if ``page_clf`` takes text as input,
+  or ``text_url`` if ``page_clf`` takes a dict with "text" and "url" keys
+  as input.
+- ``hints`` (optional): a text file with urls to always leave in relevant domains
+  if ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
 
 Settings:
 
@@ -56,7 +60,12 @@ Settings:
 - ``QUEUE_MAX_RELEVANT_DOMAINS`` - max number of relevant domains: domain is considered
   relevant if some page from that domain is considered relevant by ``page_clf``.
   Crawler drops all irrelevant domains after gathering
-  the specified number of relevant ones, and does not go to new domains any more.
+  the specified number of relevant ones (but not earlier than
+  ``RESTRICT_DELAY``, 1 hour by default), and does not go to new domains any more.
+  If more relevant domains were discovered before ``RESTRICT_DELAY``, most
+  relevant are selected accoring to sum of squares of relevant page scores.
+  If ``QUEUE_MAX_RELEVANT_DOMAINS``, only hints (see below) are left after
+  ``RESTRICT_DELAY``.
 - ``PAGE_RELEVANCY_THRESHOLD`` - a threshold when page (and thus the domain)
   is considered relevant, which is used when ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
 - ``STATS_CLASS`` - set to ``'scrapy_statsd.statscollectors.StatsDStatsCollector'``
@@ -67,12 +76,21 @@ Settings:
 - ``HTTP_PROXY``, ``HTTPS_PROXY``: set to enable onion crawling via given proxy.
   The proxy will be used only for domains ending with ".onion".
 
+When ``QUEUE_MAX_RELEVANT_DOMAINS`` is defined (even if it's zero),
+hints are also taken into account.
+They are stored as utf8-encoded urls in ``BaseRequestQueue.hints_key`` redis set.
+After broad crawling for ``RESTRICT_DELAY`` seconds, only hints and
+top ``QUEUE_MAX_RELEVANT_DOMAINS`` domains are crawled.
 
 For redis connection settings, refer to scrapy-redis docs.
 
+To start a breadth-first crawl without deep-deep::
+
+    scrapy crawl dd_crawler -a seeds=seeds.txt -o out/items.jl
+
 To export items to a .gz archive use ``gzip:`` scheme::
 
-    scrapy crawl dd_crawler -a seeds=seeds.txt -o gzip:out/items.jl
+    scrapy crawl... -o gzip:out/items.jl
 
 To get a summary of queue stats and export full stats to json,
 run (passing extra settings as needed)::
@@ -152,3 +170,13 @@ a different location: redis persists queue to disk, and it can be quite big.
 To do so on Ubuntu, edit ``/etc/default/docker``, setting the path to
 desired storage directory via ``-g`` option, e.g.
 ``DOCKER_OPTS="-g /data/docker"``, and restart docker daemon.
+
+
+Development
+-----------
+
+Run tests with ``pytest``::
+
+    py.test tests/
+
+Note that coverage is not that great, mostly custom queue is covered.

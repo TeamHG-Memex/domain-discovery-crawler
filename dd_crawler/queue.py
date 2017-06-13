@@ -1,6 +1,5 @@
 import base64
 from collections import Counter
-from functools import lru_cache
 import gzip
 import json
 import logging
@@ -17,46 +16,10 @@ from scrapy import Request
 from scrapy_redis.queue import Base
 import tldextract
 
-from .utils import warn_if_slower
+from .utils import warn_if_slower, cacheforawhile
 
 
 logger = logging.getLogger(__name__)
-
-
-def cacheforawhile(method):
-    """ Cache method for some time, so that it does not become a bottleneck.
-    """
-    max_cache_time = 30 * 60  # seconds
-    run_time_multiplier = 20
-    last_call_time = None
-    initial_cache_time = 0.5  # seconds
-    cache_time = initial_cache_time
-
-    @lru_cache(maxsize=1)
-    def cached_method(*args, **kwargs):
-        nonlocal cache_time
-        kwargs.pop('time_key')
-        t0 = time.time()
-        try:
-            return method(*args, **kwargs)
-        finally:
-            run_time = time.time() - t0
-            cache_time = min(max_cache_time, run_time * run_time_multiplier)
-            if cache_time > initial_cache_time:
-                logger.info('{} took {:.2f} s, new cache time is {:.1f} s'
-                            .format(method.__name__, run_time, cache_time))
-
-    def inner(self, *args, **kwargs):
-        if self.skip_cache:
-            return method(self, *args, **kwargs)
-        nonlocal last_call_time
-        t = time.time()
-        if not last_call_time or (t - last_call_time > cache_time):
-            last_call_time = t
-        kwargs['time_key'] = last_call_time
-        return cached_method(self, *args, **kwargs)
-
-    return inner
 
 
 # Note about race conditions: there are several workers executing this code, but
@@ -74,12 +37,14 @@ class BaseRequestQueue(Base):
     """
     def __init__(self, *args, slots_mock=None, skip_cache=False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.len_key = '{}:len'.format(self.key)  # redis int
-        self.queues_key = '{}:queues'.format(self.key)  # redis sorted set
-        self.relevant_queues_key = '{}:relevant-queues'.format(self.key)  # set
-        self.selected_relevant_key = '{}:selected-relevant'.format(self.key)  # redis int
-        self.workers_key = '{}:workers'.format(self.key)  # redis set
-        self.worker_id_key = '{}:worker-id'.format(self.key)  # redis int
+        logging.info('Init {} queue with key {}'.format(type(self), self.key))
+        self.len_key = self.fkey('len')  # int
+        self.queues_key = self.fkey('queues')  # sorted set
+        self.relevant_queues_key = self.fkey('relevant-queues')  # sorted set
+        self.did_restrict_key = self.fkey('did-restrict-domains')  # bool
+        self.hints_key = self.fkey('hinted-queues')  # set of urls, filled from outside
+        self.workers_key = self.fkey('workers')  # set
+        self.worker_id_key = self.fkey('worker-id')  # int
         self.worker_id = self.server.incr(self.worker_id_key)
         self.alive_timeout = 120  # seconds
         self.im_alive()
@@ -87,15 +52,19 @@ class BaseRequestQueue(Base):
         self.stat_each = 1000  # requests
         self.slots_mock = slots_mock
         self.skip_cache = skip_cache
-        self.max_domains = self.spider.settings.getint('QUEUE_MAX_DOMAINS')
+        settings = self.spider.settings
+        self.max_domains = settings.getint('QUEUE_MAX_DOMAINS')
         if self.max_domains:
-            print('QUEUE_MAX_DOMAINS has a bug: '
-                  'domains which queue becomes empty during crawling '
-                  'can disappear from the domain queue.',
-                  file=sys.stderr)
-        self.max_relevant_domains = \
-            self.spider.settings.getint('QUEUE_MAX_RELEVANT_DOMAINS')
+            logging.warning(
+                'QUEUE_MAX_DOMAINS has a bug: '
+                'domains which queue becomes empty during crawling '
+                'can disappear from the domain queue.')
+        self.max_relevant_domains = settings.getint('QUEUE_MAX_RELEVANT_DOMAINS')
         self.set_spider_domain_limit()
+        self.start_time = time.time()
+        self.restrict_delay = settings.getint('RESTRICT_DELAY', 3600)  # seconds
+        if getattr(self.spider, 'hint_urls', None):
+            self.add_hint_urls(self.spider.hint_urls)
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -109,8 +78,8 @@ class BaseRequestQueue(Base):
                 self.server.zrank(self.queues_key, queue_key) is None):
             # Do not add new queue, limit has been reached
             return False
-        if (self.max_relevant_domains and self.selected_relevant() and
-                not self.server.sismember(self.relevant_queues_key, queue_key)):
+        if (self.did_restrict_domains and
+                self.server.zrank(self.relevant_queues_key, queue_key) is None):
             # Such requests could come from the time we selected
             # relevant domains: some requests were in fly or in batches.
             return False
@@ -149,52 +118,70 @@ class BaseRequestQueue(Base):
                             self.server.zcard(self.queues_key))
             if self.max_relevant_domains:
                 stats.set_value('dd_crawler/queue/relevant_domains',
-                                self.server.scard(self.relevant_queues_key))
+                                self.server.zcard(self.relevant_queues_key))
 
     def clear(self):
+        logging.info('Clearing all keys for {}'.format(self.key))
         keys = {self.len_key, self.queues_key, self.relevant_queues_key,
-                self.selected_relevant_key, self.workers_key,
-                self.worker_id_key}
+                self.did_restrict_key, self.workers_key, self.worker_id_key,
+                self.hints_key}
         keys.update(self.get_workers())
         keys.update(self.get_queues())
         self.server.delete(*keys)
         super().clear()
 
-    def get_queues(self, withscores=False) \
-            -> Union[List[bytes], List[Tuple[bytes, float]]]:
-        if (self.max_relevant_domains and
-                not self.selected_relevant() and
-                self.server.scard(self.relevant_queues_key) >=
-                self.max_relevant_domains):
-            irrelevant = set(self.server.zrange(self.queues_key, 0, -1)) - \
-                         set(self.server.smembers(self.relevant_queues_key))
-            logger.info(
-                'Removing {} irrelevant domains'.format(len(irrelevant)))
-            self.server.zrem(self.queues_key, *irrelevant)
-            self.server.set(self.selected_relevant_key, 1)
+    def get_queues(self, withscores=False
+                   ) -> Union[List[bytes], List[Tuple[bytes, float]]]:
+        self.try_to_restrict_domains()
         self.set_spider_domain_limit()
         return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
+
+    def try_to_restrict_domains(self):
+        if (self.restrict_domanis
+            and not self.did_restrict_domains
+            and time.time() - self.start_time > self.restrict_delay
+            and (self.max_relevant_domains == 0
+                 or self.server.zcard(self.relevant_queues_key) >=
+                    self.max_relevant_domains)):
+            selected_relevant = {self.url_queue_key(url.decode('utf8')).encode('utf8')
+                                 for url in self.server.smembers(self.hints_key)}
+            n_hints = len(selected_relevant)
+            if self.max_relevant_domains > 0:
+                selected_relevant.update(self.server.zrange(
+                    self.relevant_queues_key, 0, self.max_relevant_domains - 1))
+            irrelevant = (set(self.server.zrange(self.queues_key, 0, -1)) -
+                          selected_relevant)
+            logger.info(
+                'Removing {:,} irrelevant domains. '
+                '{:,} relevant domains left, including {:,} hinted domains'
+                .format(len(irrelevant), len(selected_relevant), n_hints))
+            self.server.zrem(self.queues_key, *irrelevant)
+            self.server.set(self.did_restrict_key, b'1')
+
+    def add_hint_urls(self, hint_urls: List[str]):
+        for url in hint_urls:
+            self.server.sadd(self.hints_key, url.encode('utf8'))
+        logging.info('Added {} initial hint urls'.format(len(hint_urls)))
 
     def set_spider_domain_limit(self):
         """ Set domain_limit attribute on the spider: it is read by middlewares
         that limit spider to existing domains.
         """
-        if self.max_relevant_domains and self.selected_relevant():
+        if self.did_restrict_domains:
             self.spider.domain_limit = True
 
-    def selected_relevant(self) -> bool:
+    @property
+    def did_restrict_domains(self) -> bool:
         """ Relevant domains have already been selected.
         """
-        return bool(self.server.get(self.selected_relevant_key))
+        return self.restrict_domanis and self.server.get(self.did_restrict_key)
 
-    def page_is_relevant(self, url: str):
+    def page_is_relevant(self, url: str, score: float):
         """ Mark page domain as relevant, if max_relevant_domains is set.
         """
         if self.max_relevant_domains:
-            # Queue is relevant if it has relevant pages:
-            # queue score = max(page score)
             queue_key = self.url_queue_key(url)
-            self.server.sadd(self.relevant_queues_key, queue_key)
+            self.server.zincrby(self.relevant_queues_key, queue_key, -score**2)
 
     def get_workers(self) -> List[bytes]:
         return self.server.smembers(self.workers_key)
@@ -296,7 +283,7 @@ class BaseRequestQueue(Base):
         return bool(self.server.get(self._worker_key(worker_id)))
 
     def _worker_key(self, worker_id) -> str:
-        return '{}:worker-{}'.format(self.key, worker_id)
+        return self.fkey('worker-{}'.format(worker_id))
 
     def pop_from_queue(self, queue_key: bytes, n: int) -> List[Request]:
         """ Pop values with highest priorities from the given queue.
@@ -331,11 +318,11 @@ class BaseRequestQueue(Base):
         """ Key for request queue (based on it's SLD).
         """
         domain = tldextract.extract(url).registered_domain.lower()
-        return '{}:domain:{}'.format(self.key, domain)
+        return self.fkey('domain:{}'.format(domain))
 
     def queue_key_domain(self, queue_key: bytes) -> str:
         queue_key = queue_key.decode('utf8')
-        prefix = '{}:domain:'.format(self.key)
+        prefix = self.fkey('domain:')
         assert queue_key.startswith(prefix)
         return queue_key[len(prefix):]
 
@@ -350,6 +337,13 @@ class BaseRequestQueue(Base):
                 (name.decode('utf8'), -score, self.server.zcard(name))
                 for name, score in queues],
         )
+
+    @property
+    def restrict_domanis(self):
+        return self.max_relevant_domains is not None
+
+    def fkey(self, s):
+        return '{}:{}'.format(self.key, s)
 
     # This _encode_request and _decode_request are used only in tests,
     # they are overriden in CompactQueue for production use.
