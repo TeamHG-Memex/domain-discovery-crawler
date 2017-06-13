@@ -63,6 +63,8 @@ class BaseRequestQueue(Base):
         self.set_spider_domain_limit()
         self.start_time = time.time()
         self.restrict_delay = settings.getint('RESTRICT_DELAY', 3600)  # seconds
+        if getattr(self.spider, 'hint_urls', None):
+            self.add_hint_urls(self.spider.hint_urls)
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -155,6 +157,11 @@ class BaseRequestQueue(Base):
                 .format(len(irrelevant), len(selected_relevant), n_hints))
             self.server.zrem(self.queues_key, *irrelevant)
             self.server.set(self.did_restrict_key, b'1')
+
+    def add_hint_urls(self, hint_urls: List[str]):
+        for url in hint_urls:
+            self.server.sadd(self.hints_key, url.encode('utf8'))
+        logging.info('Added {} initial hint urls'.format(len(hint_urls)))
 
     def set_spider_domain_limit(self):
         """ Set domain_limit attribute on the spider: it is read by middlewares

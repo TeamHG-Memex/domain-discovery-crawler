@@ -61,12 +61,15 @@ class GeneralSpider(Spider):
 class DeepDeepSpider(GeneralSpider):
     name = 'deepdeep'
 
-    def __init__(self, clf=None, page_clf=None, classifier_input='text',
+    def __init__(self, clf=None, page_clf=None, classifier_input='text', hints=None,
                  **kwargs):
         if clf:  # can be empty if we just want to get queue stats
             self.link_clf = LinkClassifier.load(clf)
         self.page_clf = PageClassifier(
             page_clf, classifier_input=classifier_input) if page_clf else None
+        if hints:
+            with open(hints) as f:
+                self.hint_urls = [line.strip() for line in f]
         super().__init__(**kwargs)
 
     def start_requests(self):

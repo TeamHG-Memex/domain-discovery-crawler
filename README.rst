@@ -45,6 +45,8 @@ Arguments:
   should be ``text`` if ``page_clf`` takes text as input,
   or ``text_url`` if ``page_clf`` takes a dict with "text" and "url" keys
   as input.
+- ``hints`` (optional): a text file with urls to always leave in relevant domains
+  if ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
 
 Settings:
 
