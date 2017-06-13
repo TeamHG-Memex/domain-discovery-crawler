@@ -170,3 +170,13 @@ a different location: redis persists queue to disk, and it can be quite big.
 To do so on Ubuntu, edit ``/etc/default/docker``, setting the path to
 desired storage directory via ``-g`` option, e.g.
 ``DOCKER_OPTS="-g /data/docker"``, and restart docker daemon.
+
+
+Development
+-----------
+
+Run tests with ``pytest``::
+
+    py.test tests/
+
+Note that coverage is not that great, mostly custom queue is covered.
