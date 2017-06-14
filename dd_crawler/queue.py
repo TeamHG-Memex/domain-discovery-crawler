@@ -42,7 +42,7 @@ class BaseRequestQueue(Base):
         self.queues_key = self.fkey('queues')  # sorted set
         self.relevant_queues_key = self.fkey('relevant-queues')  # sorted set
         self.did_restrict_key = self.fkey('did-restrict-domains')  # bool
-        self.hints_key = self.fkey('hinted-queues')  # set of urls, filled from outside
+        self.hints_key = self.fkey('hint-urls')  # set of urls, filled from outside
         self.workers_key = self.fkey('workers')  # set
         self.worker_id_key = self.fkey('worker-id')  # int
         self.worker_id = self.server.incr(self.worker_id_key)
@@ -160,8 +160,14 @@ class BaseRequestQueue(Base):
 
     def add_hint_urls(self, hint_urls: List[str]):
         for url in hint_urls:
-            self.server.sadd(self.hints_key, url.encode('utf8'))
+            self.add_hint_url(url)
         logging.info('Added {} initial hint urls'.format(len(hint_urls)))
+
+    def add_hint_url(self, url: str):
+        self.server.sadd(self.hints_key, url.encode('utf8'))
+
+    def remove_hint_url(self, url: str):
+        self.server.srem(self.hints_key, url.encode('utf8'))
 
     def set_spider_domain_limit(self):
         """ Set domain_limit attribute on the spider: it is read by middlewares

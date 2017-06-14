@@ -78,9 +78,11 @@ Settings:
 
 When ``QUEUE_MAX_RELEVANT_DOMAINS`` is defined (even if it's zero),
 hints are also taken into account.
-They are stored as utf8-encoded urls in ``BaseRequestQueue.hints_key`` redis set.
 After broad crawling for ``RESTRICT_DELAY`` seconds, only hints and
 top ``QUEUE_MAX_RELEVANT_DOMAINS`` domains are crawled.
+Hints can be passed either via ``hints`` spider argument, or added/removed
+on the fly using the ``scrapy hint <spider> (pin|unpin) <url>`` command.
+They are stored as utf8-encoded urls in ``BaseRequestQueue.hints_key`` redis set.
 
 For redis connection settings, refer to scrapy-redis docs.
 
