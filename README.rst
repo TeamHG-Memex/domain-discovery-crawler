@@ -75,6 +75,8 @@ Settings:
   (see ``dd_crawler.middleware.log.RequestLogMiddleware.log_item``).
 - ``HTTP_PROXY``, ``HTTPS_PROXY``: set to enable onion crawling via given proxy.
   The proxy will be used only for domains ending with ".onion".
+- ``FILES_STORE``: all media items would be downloaded and saved to ``FILES_STORE``.
+  S3 and filesystem supported, refer to scrapy docs.
 
 When ``QUEUE_MAX_RELEVANT_DOMAINS`` is defined (even if it's zero),
 hints are also taken into account.

@@ -21,6 +21,9 @@ class GeneralSpider(Spider):
     def __init__(self, seeds=None, profile=None):
         super().__init__()
         self.le = LinkExtractor(canonicalize=False)
+        self.files_le = LinkExtractor(deny_extensions=[], canonicalize=False)
+        self.images_le = LinkExtractor(
+            tags=['img'], attrs=['src'], deny_extensions=[], canonicalize=False)
         if seeds:
             with open(seeds) as f:
                 self.start_urls = [line.strip() for line in f]
@@ -30,7 +33,7 @@ class GeneralSpider(Spider):
     def parse(self, response: Response):
         if not isinstance(response, HtmlResponse):
             return
-        yield from self.extract_urls(response)
+        yield from self.extract_requests(response)
         yield self.page_item(response)
         stats = self.crawler.stats
         # To have a number of scraped items in statsd for the **current** crawl
@@ -38,7 +41,7 @@ class GeneralSpider(Spider):
         stats.set_value('item_scraped_current_crawl',
                         stats.get_value('item_scraped_count', 0))
 
-    def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
+    def extract_requests(self, response: HtmlResponse) -> Iterator[Request]:
         if self.settings.getbool('AUTOPAGER'):
             for url in autopager.urls(response):
                 with dont_increase_depth(response):
@@ -47,10 +50,16 @@ class GeneralSpider(Spider):
             yield Request(url=link.url)
 
     def page_item(self, response: HtmlResponse) -> Item:
+        media_urls = []
+        get_urls = lambda le: (link.url for link in le.extract_links(response))
+        if self.settings.get('FILES_STORE'):
+            media_urls.extend(get_urls(self.images_le))
+            media_urls.extend(set(get_urls(self.files_le)) - set(get_urls(self.le)))
         return text_cdr_item(
             response,
             crawler_name=self.settings.get('CDR_CRAWLER'),
             team_name=self.settings.get('CDR_TEAM'),
+            objects=media_urls,
             metadata={
                 'depth': response.meta.get('depth'),
                 'priority': response.request.priority,
@@ -95,7 +104,7 @@ class DeepDeepSpider(GeneralSpider):
         except AttributeError:
             return None
 
-    def extract_urls(self, response: HtmlResponse) -> Iterator[Request]:
+    def extract_requests(self, response: HtmlResponse) -> Iterator[Request]:
         urls = self.link_clf.extract_urls_from_response(response)
         if self.page_clf:
             page_score = self.page_score(response)

@@ -51,6 +51,10 @@ SPIDER_MIDDLEWARES = {
     'dd_crawler.middleware.dupesegments.DupeSegmentsMiddleware': 750,
 }
 
+ITEM_PIPELINES = {
+    'scrapy_cdr.media_pipeline.CDRMediaPipeline': 1,
+}
+
 FEED_STORAGES = {
     'gzip': 'deepdeep.exports.GzipFileFeedStorage',
 }
