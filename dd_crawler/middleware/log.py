@@ -38,7 +38,7 @@ class RequestLogMiddleware:
         self.n_crawled += 1
         domain = get_domain(item['url'])
         self.domains.add(domain)
-        score = item.get('extracted_metadata', {}).get('page_score', 0.)
+        score = item.get('metadata', {}).get('page_score', 0.)
         if score is not None:
             self.total_score += score
             if score > self.relevancy_threshold:
