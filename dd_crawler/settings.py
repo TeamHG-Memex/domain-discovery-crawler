@@ -55,6 +55,8 @@ ITEM_PIPELINES = {
     'scrapy_cdr.media_pipeline.CDRMediaPipeline': 1,
 }
 
+MEDIA_ALLOW_REDIRECTS = True
+
 FEED_STORAGES = {
     'gzip': 'deepdeep.exports.GzipFileFeedStorage',
 }
