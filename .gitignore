@@ -4,4 +4,11 @@ __pycache__
 *.prof
 *.vmprof
 *.log
+*.txt
+*.html
+*.csv
+*.gz
+*.joblib
+*.json
+*.jl
 out/
