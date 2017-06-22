@@ -19,5 +19,5 @@ scrapy crawl \
     -s REDIS_HOST=redis \
     -s LOG_FILE=/out/${hostname}.log \
     -a profile=/out/${hostname} \
-    -s RESPONSE_LOG_FILE=/out/${hostname}.csv \
+    -s RESPONSE_LOG_FILE=/out/${hostname}.log.jl \
     $*

@@ -1,4 +1,4 @@
-import csv
+import json
 import time
 
 from scrapy.exceptions import NotConfigured
@@ -17,7 +17,6 @@ class RequestLogMiddleware:
         self.total_score = 0.
         self.n_crawled = 0
         self.log_file = open(log_path, 'at')
-        self.log_writer = csv.writer(self.log_file)
         self.relevancy_threshold = relevancy_threshold
 
     @classmethod
@@ -38,21 +37,25 @@ class RequestLogMiddleware:
         self.n_crawled += 1
         domain = get_domain(item['url'])
         self.domains.add(domain)
-        score = item.get('metadata', {}).get('page_score', 0.)
+        metadata = item.get('metadata', {})
+        score = metadata.get('page_score', 0.)
         if score is not None:
             self.total_score += score
             if score > self.relevancy_threshold:
                 self.relevant_domains.add(domain)
-        log_entry = [
-            '{:.3f}'.format(time.time()),
-            response.url,
-            response.meta.get('depth', ''),
-            response.request.priority,
-            '{:.3f}'.format(score),
-            '{:.3f}'.format(self.total_score),
-            self.n_crawled,
-            len(self.domains),
-            len(self.relevant_domains),
-        ]
-        self.log_writer.writerow([str(x) for x in log_entry])
+        log_entry = {
+            'time': time.time(),
+            'url': response.url,
+            'depth': response.meta.get('depth', ''),
+            'priority': response.request.priority,
+            'score': score,
+            'total_score': self.total_score,
+            'n_crawled': self.n_crawled,
+            'n_domains': len(self.domains),
+            'n_relevant_domains': len(self.relevant_domains),
+        }
+        if metadata.get('has_login_form'):
+            log_entry['has_login_form'] = True
+        json.dump(log_entry, self.log_file)
+        self.log_file.write('\n')
         self.log_file.flush()

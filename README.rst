@@ -71,7 +71,7 @@ Settings:
 - ``STATS_CLASS`` - set to ``'scrapy_statsd.statscollectors.StatsDStatsCollector'``
   in order to push scrapy stats to statsd for spider monitoring.
   Set ``STATSD_HOST`` and, optionally, ``STATSD_PORT``.
-- ``RESPONSE_LOG_FILE`` - path to spider stats log in csv format
+- ``RESPONSE_LOG_FILE`` - path to spider stats log in json lines format
   (see ``dd_crawler.middleware.log.RequestLogMiddleware.log_item``).
 - ``HTTP_PROXY``, ``HTTPS_PROXY``: set to enable onion crawling via given proxy.
   The proxy will be used only for domains ending with ".onion".
@@ -101,9 +101,10 @@ run (passing extra settings as needed)::
 
     scrapy queue_stats dd_crawler -o stats.json
 
-To get a summary of response speed, set ``RESPONSE_LOG_FILE`` setting, and use::
+To get a summary of response speed, set ``RESPONSE_LOG_FILE`` setting,
+and use (assuming it ends with .log.jl)::
 
-    scrapy response_stat out/*.csv
+    scrapy response_stat out/*.log.jl
 
 You can also specify ``-o`` or ``--output`` argument to save charts to html
 file instead of showing them.

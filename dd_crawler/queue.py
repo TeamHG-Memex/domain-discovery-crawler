@@ -143,8 +143,9 @@ class BaseRequestQueue(Base):
             and (self.max_relevant_domains == 0
                  or self.server.zcard(self.relevant_queues_key) >=
                     self.max_relevant_domains)):
-            selected_relevant = {self.url_queue_key(url.decode('utf8')).encode('utf8')
-                                 for url in self.server.smembers(self.hints_key)}
+            selected_relevant = {
+                self.url_queue_key(url.decode('utf8')).encode('utf8')
+                for url in self.server.smembers(self.hints_key)}
             n_hints = len(selected_relevant)
             if self.max_relevant_domains > 0:
                 selected_relevant.update(self.server.zrange(
