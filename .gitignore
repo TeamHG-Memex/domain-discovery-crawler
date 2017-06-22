@@ -5,9 +5,11 @@ __pycache__
 *.vmprof
 *.log
 *.txt
+!requirements.txt
 *.html
 *.csv
 *.gz
+!docker/deep-deep-0.0.tar.gz
 *.joblib
 *.json
 *.jl
