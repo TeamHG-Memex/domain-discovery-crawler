@@ -137,10 +137,10 @@ class DeepDeepSpider(GeneralSpider):
         item = super().page_item(response)
         if self.page_clf:
             item['metadata']['page_score'] = self.page_score(response)
-        if self.settings.get('AUTOLOGIN_ENABLED'):
-            # TODO - check if we have already found a login form on this domain
+        if (self.settings.get('AUTOLOGIN_ENABLED') and
+                not self.queue.has_login_form(response.url)):
             for form_el, form_meta in extract_forms(response.text, fields=False):
                 if form_meta.get('form') == 'login':
-                    # TODO - mark domain as having login form
+                    self.queue.add_login_form(response.url)
                     item['metadata']['has_login_form'] = True
         return item
