@@ -6,6 +6,7 @@ setup(
     packages=['dd_crawler'],
     install_requires=[
         'autopager',
+        'autologin-middleware',
         # 'deepdeep',
         'Formasaurus',
         'html_text>=0.2.1',

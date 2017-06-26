@@ -36,10 +36,16 @@ REDIRECT_PRIORITY_ADJUST = 1
 
 DEPTH_PRIORITY = 1
 
+AUTOLOGIN_URL = 'http://127.0.0.1:8089'
+AUTOLOGIN_ENABLED = False  #
+
 DOWNLOADER_MIDDLEWARES = {
     'proxy_middleware.ProxyOnlyTorMiddleware': 10,
     'scrapy.downloadermiddlewares.redirect.RedirectMiddleware': None,
     'dd_crawler.middleware.domains.ForbidOffsiteRedirectsMiddleware': 600,
+    'dd_crawler.middleware.DDAutologinMiddleware': 605,
+    'scrapy.downloadermiddlewares.cookies.CookiesMiddleware': None,
+    'autologin_middleware.ExposeCookiesMiddleware': 700,
 }
 
 MAX_DUPLICATE_PATH_SEGMENTS = 5

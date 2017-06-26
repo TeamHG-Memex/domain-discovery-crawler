@@ -356,13 +356,18 @@ class BaseRequestQueue(Base):
         domain = get_domain(url).encode('utf8')
         return self.server.sadd(self.has_login_form_key, domain)
 
-    def add_login_credentials(self, url, login, password):
+    def add_login_credentials(self, url: str, login: str, password: str):
         domain = get_domain(url)
         credentials = json.dumps(
             {'url': url, 'login': login, 'password': password})
         self.server.hset(
             self.login_credentials_key,
             domain.encode('utf8'), credentials.encode('utf8'))
+
+    def has_login_credentials(self, url: str) -> bool:
+        domain = get_domain(url)
+        return bool(self.server.hget(
+            self.login_credentials_key, domain.encode('utf8')))
 
     @property
     def restrict_domanis(self):
