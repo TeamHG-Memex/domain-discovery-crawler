@@ -16,7 +16,7 @@ from scrapy import Request
 from scrapy_redis.queue import Base
 import tldextract
 
-from .utils import warn_if_slower, cacheforawhile
+from .utils import warn_if_slower, cacheforawhile, get_int_or_None
 
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,8 @@ class BaseRequestQueue(Base):
                 'QUEUE_MAX_DOMAINS has a bug: '
                 'domains which queue becomes empty during crawling '
                 'can disappear from the domain queue.')
-        self.max_relevant_domains = settings.getint('QUEUE_MAX_RELEVANT_DOMAINS')
+        self.max_relevant_domains = (
+            get_int_or_None(settings, 'QUEUE_MAX_RELEVANT_DOMAINS'))
         self.set_spider_domain_limit()
         self.start_time = time.time()
         self.restrict_delay = settings.getint('RESTRICT_DELAY', 3600)  # seconds
