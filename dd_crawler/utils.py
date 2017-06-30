@@ -6,8 +6,10 @@ import os.path
 import signal
 import time
 from urllib.parse import urlsplit
+from typing import Optional
 
 import html_text
+from scrapy.settings import Settings
 from sklearn.externals import joblib
 import vmprof
 
@@ -79,6 +81,13 @@ def dont_increase_depth(response):
         yield
     finally:
         response.meta['depth'] += 1
+
+
+def get_int_or_None(settings: Settings, key: str) -> Optional[int]:
+    value = settings.get(key)
+    if value is None or value == '':
+        return None
+    return int(value)
 
 
 def setup_profiling(profile):

@@ -11,6 +11,8 @@ import pandas as pd
 from scrapy.commands import ScrapyCommand
 from scrapy.exceptions import UsageError
 
+from dd_crawler.utils import get_domain
+
 
 class Command(ScrapyCommand):
     requires_project = True
@@ -20,10 +22,12 @@ class Command(ScrapyCommand):
 
     def add_options(self, parser):
         ScrapyCommand.add_options(self, parser)
-        parser.add_option('-o', '--output',
-                          help='prefix for charts (without ".html")')
-        parser.add_option('--step', type=float, default=30, help='time step, s')
-        parser.add_option('--smooth', type=int, default=50, help='smooth span')
+        arg = parser.add_option
+        arg('-o', '--output', help='prefix for charts (without ".html")')
+        arg('--step', type=float, default=30, help='time step, s')
+        arg('--smooth', type=int, default=50, help='smooth span')
+        arg('--top', type=int, default=30, help='top domains to show')
+        arg('--no-show', action='store_true', help='don\'t show charts')
 
     def short_desc(self):
         return 'Print short speed summary, save charts to a file'
@@ -100,14 +104,15 @@ def print_rpms(all_rpms: List[pd.DataFrame], opts):
     rpms_title = 'Requests per minute'
     rpms_plot = TimeSeries(joined_rpms, plot_width=1000,
                            xlabel='time', ylabel='rpm', title=rpms_title)
-    save_plot(rpms_plot, title=rpms_title, suffix='rpms', output=opts.output)
+    if not opts.no_show:
+        save_plot(rpms_plot, title=rpms_title, suffix='rpms', output=opts.output)
 
 
 def save_plot(plot, title, suffix, output):
     if output:
-        rpms_output = '{}-{}.html'.format(output, suffix)
-        print('Saving plot to {}'.format(rpms_output))
-        bokeh.plotting.output_file(rpms_output, title=title, mode='inline')
+        filename = '{}-{}.html'.format(output, suffix)
+        print('Saving plot to {}'.format(filename))
+        bokeh.plotting.output_file(filename, title=title, mode='inline')
         bokeh.plotting.save(plot)
     else:
         bokeh.plotting.show(plot)
@@ -130,13 +135,14 @@ def print_averages(items: Dict[str, pd.Series],
 
 
 def print_scores(response_logs: List[pd.DataFrame], opts):
-    joined = pd.concat(response_logs)
+    joined = pd.concat(response_logs)  # type: pd.DataFrame
     binary_score = joined['score'] > 0.5
     print()
-    print('Total number of pages: {}, relevant pages: {}, '
+    print('Total number of pages: {:,}, relevant pages: {:,}, '
           'average binary score: {:.2f}, average score: {:.2f}'.format(
             len(joined), binary_score.sum(), binary_score.mean(),
             joined['score'].mean()))
+    show_domain_stats(joined.copy(), output=opts.output, top=opts.top)
     joined.sort_values(by='timestamp', inplace=True)
     joined.index = pd.to_datetime(joined.pop('timestamp'), unit='s')
     if opts.smooth:
@@ -150,4 +156,29 @@ def print_scores(response_logs: List[pd.DataFrame], opts):
     plot = TimeSeries(scores, plot_width=1000,
                       xlabel='time', ylabel='score', title=title)
     plot.set(y_range=Range1d(0, 1))
-    save_plot(plot, title=title, suffix='score', output=opts.output)
+    if not opts.no_show:
+        save_plot(plot, title=title, suffix='score', output=opts.output)
+
+
+def show_domain_stats(log, output, top=50):
+    log['Domain'] = log['url'].apply(get_domain)
+    by_domain = log.groupby('Domain')
+    top_domains = (
+        by_domain.count().sort_values('url', ascending=False)['url'].index)
+    stats_by_domain = pd.DataFrame(index=top_domains)
+    stats_by_domain['Pages'] = by_domain.count()['url']
+    stats_by_domain['Total Score'] = by_domain.sum()['score'].astype(int)
+    stats_by_domain['Mean Score'] = by_domain.mean()['score']
+    stats_by_domain['Max Depth'] = by_domain.max()['depth']
+    stats_by_domain['Median Depth'] = by_domain.median()['depth'].astype(int)
+    print()
+    pages = stats_by_domain['Pages']
+    print('Top {} domains stats (covering {:.1%} pages)'
+          .format(top, pages[:top].sum() / pages.sum()))
+    pd.set_option('display.width', 1000)
+    print(stats_by_domain[:top])
+    if output:
+        filename = '{}-by-domain.csv'.format(output)
+        stats_by_domain.to_csv(filename)
+        print()
+        print('Saved domain stats to {}'.format(filename))
