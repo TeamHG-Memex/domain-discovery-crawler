@@ -6,7 +6,7 @@ from typing import Dict, List
 from bokeh.charts import TimeSeries
 from bokeh.models import Range1d
 import bokeh.plotting
-import pandas
+import pandas as pd
 from scrapy.commands import ScrapyCommand
 from scrapy.exceptions import UsageError
 
@@ -44,7 +44,7 @@ class Command(ScrapyCommand):
             raise UsageError()
 
         response_logs = [
-            pandas.read_csv(filename, header=None, names=[
+            pd.read_csv(filename, header=None, names=[
                 'timestamp', 'url', 'depth', 'priority', 'score'])
             for filename in filenames]
         print('Read data from {} files'.format(len(filenames)))
@@ -59,8 +59,8 @@ class Command(ScrapyCommand):
         print_scores(response_logs, opts)
 
 
-def get_rpms(filename: str, response_log: pandas.DataFrame,
-             step: float, smooth: int) -> pandas.DataFrame:
+def get_rpms(filename: str, response_log: pd.DataFrame,
+             step: float, smooth: int) -> pd.DataFrame:
     timestamps = response_log['timestamp']
     buffer = []
     if len(timestamps) == 0:
@@ -76,15 +76,15 @@ def get_rpms(filename: str, response_log: pandas.DataFrame,
         buffer.append(ts)
     if rpms:
         name = os.path.basename(filename)
-        rpms = pandas.DataFrame(rpms, columns=['timestamp', name])
+        rpms = pd.DataFrame(rpms, columns=['timestamp', name])
         if smooth:
             rpms[name] = rpms[name].ewm(span=smooth).mean()
-        rpms.index = pandas.to_datetime(rpms.pop('timestamp'), unit='s')
+        rpms.index = pd.to_datetime(rpms.pop('timestamp'), unit='s')
         return rpms
 
 
-def print_rpms(all_rpms: List[pandas.DataFrame], opts):
-    joined_rpms = pandas.DataFrame()
+def print_rpms(all_rpms: List[pd.DataFrame], opts):
+    joined_rpms = pd.DataFrame()
     for df in all_rpms:
         joined_rpms = joined_rpms.join(df, how='outer')
     joined_rpms.fillna(0, inplace=True)
@@ -112,7 +112,7 @@ def save_plot(plot, title, suffix, output):
         bokeh.plotting.show(plot)
 
 
-def print_averages(items: Dict[str, pandas.Series],
+def print_averages(items: Dict[str, pd.Series],
                    step: int, fmt: str = '{:.0f}'):
     last_n = 10
     print()
@@ -128,8 +128,8 @@ def print_averages(items: Dict[str, pandas.Series],
     print()
 
 
-def print_scores(response_logs: List[pandas.DataFrame], opts):
-    joined = pandas.concat(response_logs)
+def print_scores(response_logs: List[pd.DataFrame], opts):
+    joined = pd.concat(response_logs)  # type: pd.DataFrame
     binary_score = joined['score'] > 0.5
     print()
     print('Total number of pages: {}, relevant pages: {}, '
@@ -137,7 +137,7 @@ def print_scores(response_logs: List[pandas.DataFrame], opts):
             len(joined), binary_score.sum(), binary_score.mean(),
             joined['score'].mean()))
     joined.sort_values(by='timestamp', inplace=True)
-    joined.index = pandas.to_datetime(joined.pop('timestamp'), unit='s')
+    joined.index = pd.to_datetime(joined.pop('timestamp'), unit='s')
     if opts.smooth:
         crawl_time = (joined.index[-1] - joined.index[0]).total_seconds()
         avg_rps = len(joined) / crawl_time
