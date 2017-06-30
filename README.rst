@@ -101,7 +101,8 @@ run (passing extra settings as needed)::
 
     scrapy queue_stats dd_crawler -o stats.json
 
-To get a summary of response speed, set ``RESPONSE_LOG_FILE`` setting, and use::
+To get a summary of response speed,
+set ``RESPONSE_LOG_FILE`` setting during crawling, and use::
 
     scrapy response_stat out/*.csv
 
