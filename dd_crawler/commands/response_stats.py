@@ -44,8 +44,13 @@ class Command(ScrapyCommand):
             raise UsageError()
 
         response_logs = [
-            pd.read_csv(filename, header=None, names=[
-                'timestamp', 'url', 'depth', 'priority', 'score'])
+            pd.read_csv(
+                filename,
+                header=None,
+                names=['timestamp', 'url', 'depth', 'priority', 'score',
+                       'total_score', 'n_crawled', 'n_domains',
+                       'n_relevant_domains'],
+                index_col=False)
             for filename in filenames]
         print('Read data from {} files'.format(len(filenames)))
 
