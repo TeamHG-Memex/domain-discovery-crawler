@@ -26,6 +26,7 @@ class Command(ScrapyCommand):
         arg('--step', type=float, default=30, help='time step, s')
         arg('--smooth', type=int, default=50, help='smooth span')
         arg('--top', type=int, default=30, help='top domains to show')
+        arg('--no-show', action='store_true', help='don\'t show charts')
 
     def short_desc(self):
         return 'Print short speed summary, save charts to a file'
@@ -107,7 +108,8 @@ def print_rpms(all_rpms: List[pd.DataFrame], opts):
     rpms_title = 'Requests per minute'
     rpms_plot = TimeSeries(joined_rpms, plot_width=1000,
                            xlabel='time', ylabel='rpm', title=rpms_title)
-    save_plot(rpms_plot, title=rpms_title, suffix='rpms', output=opts.output)
+    if not opts.no_show:
+        save_plot(rpms_plot, title=rpms_title, suffix='rpms', output=opts.output)
 
 
 def save_plot(plot, title, suffix, output):
@@ -140,7 +142,7 @@ def print_scores(response_logs: List[pd.DataFrame], opts):
     joined = pd.concat(response_logs)  # type: pd.DataFrame
     binary_score = joined['score'] > 0.5
     print()
-    print('Total number of pages: {}, relevant pages: {}, '
+    print('Total number of pages: {:,}, relevant pages: {:,}, '
           'average binary score: {:.2f}, average score: {:.2f}'.format(
             len(joined), binary_score.sum(), binary_score.mean(),
             joined['score'].mean()))
@@ -158,7 +160,8 @@ def print_scores(response_logs: List[pd.DataFrame], opts):
     plot = TimeSeries(scores, plot_width=1000,
                       xlabel='time', ylabel='score', title=title)
     plot.set(y_range=Range1d(0, 1))
-    save_plot(plot, title=title, suffix='score', output=opts.output)
+    if not opts.no_show:
+        save_plot(plot, title=title, suffix='score', output=opts.output)
 
 
 def show_domain_stats(log, output, top=50):
@@ -168,7 +171,7 @@ def show_domain_stats(log, output, top=50):
         by_domain.count().sort_values('url', ascending=False)['url'].index)
     stats_by_domain = pd.DataFrame(index=top_domains)
     stats_by_domain['Pages'] = by_domain.count()['url']
-    stats_by_domain['Total Score'] = by_domain.sum()['score']
+    stats_by_domain['Total Score'] = by_domain.sum()['score'].astype(int)
     stats_by_domain['Mean Score'] = by_domain.mean()['score']
     stats_by_domain['Max Depth'] = by_domain.max()['depth']
     stats_by_domain['Median Depth'] = by_domain.median()['depth'].astype(int)
@@ -176,6 +179,7 @@ def show_domain_stats(log, output, top=50):
     pages = stats_by_domain['Pages']
     print('Top {} domains stats (covering {:.1%} pages)'
           .format(top, pages[:top].sum() / pages.sum()))
+    pd.set_option('display.width', 1000)
     print(stats_by_domain[:top])
     if output:
         filename = '{}-by-domain.csv'.format(output)
