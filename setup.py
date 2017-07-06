@@ -9,7 +9,7 @@ setup(
         # 'deepdeep',
         'html_text>=0.2.1',
         'numpy',
-        'scrapy-cdr',
+        'scrapy-cdr>=0.4.0',
         'scrapy-redis>=0.6.8',
         'scrapy>=1.1.0',
         'tldextract',

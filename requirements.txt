@@ -5,7 +5,7 @@ scikit-learn==0.18.1
 scipy==0.18.1
 pandas
 scrapy==1.4.0
-scrapy-cdr>=0.3.2
+scrapy-cdr>=0.4.0
 tldextract
 vmprof
 statsd
