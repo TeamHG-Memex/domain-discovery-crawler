@@ -3,6 +3,7 @@ from typing import Iterator, Optional
 
 import autopager
 from deepdeep.predictor import LinkClassifier
+from formasaurus import extract_forms
 from scrapy import Spider, Request, Item
 from scrapy.exceptions import NotConfigured
 from scrapy.http.response import Response
@@ -136,4 +137,10 @@ class DeepDeepSpider(GeneralSpider):
         item = super().page_item(response)
         if self.page_clf:
             item['metadata']['page_score'] = self.page_score(response)
+        if (self.settings.get('AUTOLOGIN_ENABLED') and
+                not self.queue.has_login_form(response.url)):
+            for form_el, form_meta in extract_forms(response.text, fields=False):
+                if form_meta.get('form') == 'login':
+                    self.queue.add_login_form(response.url)
+                    item['metadata']['has_login_form'] = True
         return item

@@ -54,6 +54,8 @@ class RequestLogMiddleware:
             'n_domains': len(self.domains),
             'n_relevant_domains': len(self.relevant_domains),
         }
+        if metadata.get('has_login_form'):
+            log_entry['has_login_form'] = True
         json.dump(log_entry, self.log_file)
         self.log_file.write('\n')
         self.log_file.flush()

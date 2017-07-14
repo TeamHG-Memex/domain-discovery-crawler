@@ -43,6 +43,10 @@ class BaseRequestQueue(Base):
         self.did_restrict_key = self.fkey('did-restrict-domains')  # bool
         # set of hint urls, filled from outside
         self.hints_key = self.fkey('hint-urls')
+        # set of domains with login form found
+        self.has_login_form_key = self.fkey('login-form-domains')
+        # hash with domain as key and json-encoded credentials as value
+        self.login_credentials_key = self.fkey('login-credentials')
         self.workers_key = self.fkey('workers')  # set
         self.worker_id_key = self.fkey('worker-id')  # int
         self.worker_id = self.server.incr(self.worker_id_key)
@@ -344,6 +348,27 @@ class BaseRequestQueue(Base):
             queues=[(name.decode('utf8'), -score, self.server.zcard(name))
                     for name, score in queues],
         )
+
+    def has_login_form(self, url):
+        domain = get_domain(url).encode('utf8')
+        return self.server.sismember(self.has_login_form_key, domain)
+
+    def add_login_form(self, url):
+        domain = get_domain(url).encode('utf8')
+        return self.server.sadd(self.has_login_form_key, domain)
+
+    def add_login_credentials(self, url: str, login: str, password: str):
+        domain = get_domain(url)
+        credentials = json.dumps(
+            {'url': url, 'login': login, 'password': password})
+        self.server.hset(
+            self.login_credentials_key,
+            domain.encode('utf8'), credentials.encode('utf8'))
+
+    def has_login_credentials(self, url: str) -> bool:
+        domain = get_domain(url)
+        return bool(self.server.hget(
+            self.login_credentials_key, domain.encode('utf8')))
 
     @property
     def restrict_domanis(self):
