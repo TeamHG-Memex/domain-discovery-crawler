@@ -5,7 +5,6 @@ import json
 import logging
 import math
 import random
-import sys
 import time
 from typing import Optional, List, Tuple, Union, Dict
 from zlib import crc32
@@ -16,7 +15,7 @@ from scrapy import Request
 from scrapy_redis.queue import Base
 import tldextract
 
-from .utils import warn_if_slower, cacheforawhile, get_int_or_None
+from .utils import warn_if_slower, cacheforawhile, get_int_or_None, get_domain
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,8 @@ class BaseRequestQueue(Base):
         self.queues_key = self.fkey('queues')  # sorted set
         self.relevant_queues_key = self.fkey('relevant-queues')  # sorted set
         self.did_restrict_key = self.fkey('did-restrict-domains')  # bool
-        self.hints_key = self.fkey('hint-urls')  # set of urls, filled from outside
+        # set of hint urls, filled from outside
+        self.hints_key = self.fkey('hint-urls')
         self.workers_key = self.fkey('workers')  # set
         self.worker_id_key = self.fkey('worker-id')  # int
         self.worker_id = self.server.incr(self.worker_id_key)
@@ -144,8 +144,9 @@ class BaseRequestQueue(Base):
             and (self.max_relevant_domains == 0
                  or self.server.zcard(self.relevant_queues_key) >=
                     self.max_relevant_domains)):
-            selected_relevant = {self.url_queue_key(url.decode('utf8')).encode('utf8')
-                                 for url in self.server.smembers(self.hints_key)}
+            selected_relevant = {
+                self.url_queue_key(url.decode('utf8')).encode('utf8')
+                for url in self.server.smembers(self.hints_key)}
             n_hints = len(selected_relevant)
             if self.max_relevant_domains > 0:
                 selected_relevant.update(self.server.zrange(
@@ -340,9 +341,8 @@ class BaseRequestQueue(Base):
         return dict(
             len=len(self),
             n_domains=len(queues),
-            queues=[
-                (name.decode('utf8'), -score, self.server.zcard(name))
-                for name, score in queues],
+            queues=[(name.decode('utf8'), -score, self.server.zcard(name))
+                    for name, score in queues],
         )
 
     @property

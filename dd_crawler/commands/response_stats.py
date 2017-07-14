@@ -1,11 +1,12 @@
 import os.path
 import glob
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from bokeh.charts import TimeSeries
 from bokeh.models import Range1d
 import bokeh.plotting
+import json_lines
 import pandas as pd
 from scrapy.commands import ScrapyCommand
 from scrapy.exceptions import UsageError
@@ -47,15 +48,10 @@ class Command(ScrapyCommand):
         if not filenames:
             raise UsageError()
 
-        response_logs = [
-            pd.read_csv(
-                filename,
-                header=None,
-                names=['timestamp', 'url', 'depth', 'priority', 'score',
-                       'total_score', 'n_crawled', 'n_domains',
-                       'n_relevant_domains'],
-                index_col=False)
-            for filename in filenames]
+        response_logs = []
+        for filename in filenames:
+            with json_lines.open(filename) as f:
+                response_logs.append(pd.DataFrame(f))
         print('Read data from {} files'.format(len(filenames)))
 
         all_rpms = [rpms for rpms in (
@@ -69,7 +65,7 @@ class Command(ScrapyCommand):
 
 
 def get_rpms(filename: str, response_log: pd.DataFrame,
-             step: float, smooth: int) -> pd.DataFrame:
+             step: float, smooth: int) -> Optional[pd.DataFrame]:
     timestamps = response_log['timestamp']
     buffer = []
     if len(timestamps) == 0:

@@ -8,6 +8,7 @@ setup(
         'autopager',
         # 'deepdeep',
         'html_text>=0.2.1',
+        'json-lines>=0.3.1',
         'numpy',
         'scrapy-cdr>=0.4.0',
         'scrapy-redis>=0.6.8',

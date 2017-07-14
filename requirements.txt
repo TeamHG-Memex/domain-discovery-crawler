@@ -13,4 +13,5 @@ git+https://github.com/TeamHG-Memex/scrapy-statsd.git@ops
 scrapy-redis==0.6.8
 proxy-middleware
 html_text==0.2.1
+json_lines==0.3.1
 # deep-deep
