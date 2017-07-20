@@ -77,6 +77,9 @@ Settings:
   The proxy will be used only for domains ending with ".onion".
 - ``FILES_STORE``: all media items would be downloaded and saved to ``FILES_STORE``.
   S3 and filesystem supported, refer to scrapy docs.
+- ``AUTOLOGIN_ENABLED`` - set to enable autologin support (see a separate section
+  below).
+- ``AUTOLOGIN_URL`` - set autologin HTTP API url.
 
 When ``QUEUE_MAX_RELEVANT_DOMAINS`` is defined (even if it's zero),
 hints are also taken into account.
@@ -113,6 +116,17 @@ file instead of showing them.
 Profiling is done using `vmprof <https://vmprof.readthedocs.io>`_.
 Pass ``-a profile=basepath`` to the crawler, and then send ``SIGUSR1`` to start
 and stop profiling. Result will be in ``basepath_N.vmprof`` file.
+
+
+Autologin support
++++++++++++++++++
+
+When autologin is enabled (``AUTOLOGIN_ENABLED`` is set), each domain is checked
+for login forms - results of the checks are written to ``RESPONSE_LOG_FILE``
+(into the ``metadata.has_login_form`` field), and stored in Redis.
+If credentials are added via the ``scrapy login`` command,
+which adds them to redis, an attempt to log in to the site will
+be made. If successful, the crawl of this domain will continue while logged in.
 
 
 Using docker
