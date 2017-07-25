@@ -27,7 +27,8 @@ class GeneralSpider(Spider):
             tags=['img'], attrs=['src'], deny_extensions=[], canonicalize=False)
         if seeds:
             with open(seeds) as f:
-                self.start_urls = [line.strip() for line in f]
+                self.start_urls = [url for url in (line.strip() for line in f)
+                                   if not url.startswith('#')]
         if profile:
             setup_profiling(profile)
 
