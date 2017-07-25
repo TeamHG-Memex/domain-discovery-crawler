@@ -31,6 +31,13 @@ class GeneralSpider(Spider):
         if profile:
             setup_profiling(profile)
 
+    @property
+    def queue(self) -> Optional[BaseRequestQueue]:
+        try:
+            return self.crawler.engine.slot.scheduler.queue
+        except AttributeError:
+            return None
+
     def parse(self, response: Response):
         if not isinstance(response, HtmlResponse):
             return
@@ -55,24 +62,33 @@ class GeneralSpider(Spider):
         get_urls = lambda le: (link.url for link in le.extract_links(response))
         if self.settings.get('FILES_STORE'):
             media_urls.extend(get_urls(self.images_le))
-            media_urls.extend(set(get_urls(self.files_le)) - set(get_urls(self.le)))
+            media_urls.extend(
+                set(get_urls(self.files_le)) - set(get_urls(self.le)))
+        metadata = {
+            'depth': response.meta.get('depth'),
+            'priority': response.request.priority,
+        }
+        if (self.settings.get('AUTOLOGIN_ENABLED') and
+                not self.queue.has_login_form(response.url)):
+            for form_el, form_meta in extract_forms(
+                    response.text, fields=False):
+                if form_meta.get('form') == 'login':
+                    self.queue.add_login_form(response.url)
+                    metadata['has_login_form'] = True
         return text_cdr_item(
             response,
             crawler_name=self.settings.get('CDR_CRAWLER'),
             team_name=self.settings.get('CDR_TEAM'),
             objects=media_urls,
-            metadata={
-                'depth': response.meta.get('depth'),
-                'priority': response.request.priority,
-            },
+            metadata=metadata,
         )
 
 
 class DeepDeepSpider(GeneralSpider):
     name = 'deepdeep'
 
-    def __init__(self, clf=None, page_clf=None, classifier_input='text', hints=None,
-                 **kwargs):
+    def __init__(self, clf=None, page_clf=None, classifier_input='text',
+                 hints=None, **kwargs):
         if clf:  # can be empty if we just want to get queue stats
             self.link_clf = LinkClassifier.load(clf)
         self.page_clf = PageClassifier(
@@ -83,7 +99,8 @@ class DeepDeepSpider(GeneralSpider):
         super().__init__(**kwargs)
 
     def start_requests(self):
-        if not self.page_clf and self.settings.get('QUEUE_MAX_RELEVANT_DOMAINS'):
+        if not self.page_clf and self.settings.get(
+                'QUEUE_MAX_RELEVANT_DOMAINS'):
             raise NotConfigured('Pass page_clf to spider')
         initial_priority = int(
             10 * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
@@ -97,13 +114,6 @@ class DeepDeepSpider(GeneralSpider):
     @lru_cache(maxsize=1)
     def page_score(self, response: HtmlResponse) -> float:
         return self.page_clf.get_score(html=response.text, url=response.url)
-
-    @property
-    def queue(self) -> Optional[BaseRequestQueue]:
-        try:
-            return self.crawler.engine.slot.scheduler.queue
-        except AttributeError:
-            return None
 
     def extract_requests(self, response: HtmlResponse) -> Iterator[Request]:
         urls = self.link_clf.extract_urls_from_response(response)
@@ -137,10 +147,4 @@ class DeepDeepSpider(GeneralSpider):
         item = super().page_item(response)
         if self.page_clf:
             item['metadata']['page_score'] = self.page_score(response)
-        if (self.settings.get('AUTOLOGIN_ENABLED') and
-                not self.queue.has_login_form(response.url)):
-            for form_el, form_meta in extract_forms(response.text, fields=False):
-                if form_meta.get('form') == 'login':
-                    self.queue.add_login_form(response.url)
-                    item['metadata']['has_login_form'] = True
         return item
