@@ -365,10 +365,12 @@ class BaseRequestQueue(Base):
             self.login_credentials_key,
             domain.encode('utf8'), credentials.encode('utf8'))
 
-    def has_login_credentials(self, url: str) -> bool:
+    def get_login_credentials(self, url: str) -> Optional[Dict]:
         domain = get_domain(url)
-        return bool(self.server.hget(
-            self.login_credentials_key, domain.encode('utf8')))
+        value = self.server.hget(
+            self.login_credentials_key, domain.encode('utf8'))
+        if value:
+            return json.loads(value.decode('utf8'))
 
     @property
     def restrict_domanis(self):
