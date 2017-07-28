@@ -10,13 +10,12 @@ class Site(Resource):
         self.putChild(b'', text_resource(
             '<a href="/page">page</a> '
             '<a href="/another-page">another page</a> '
-        )())
+        ))
         self.putChild(b'page', text_resource(
-            '<a href="/another-page">another page</a>')())
+            '<a href="/another-page">another page</a>'))
         self.putChild(b'another-page', text_resource(
-            '<a href="/new-page">new page</a>')())
-        self.putChild(b'new-page', text_resource(
-            '<a href="/page">page</a>')())
+            '<a href="/new-page">new page</a>'))
+        self.putChild(b'new-page', text_resource('<a href="/page">page</a>'))
 
 
 @inlineCallbacks
