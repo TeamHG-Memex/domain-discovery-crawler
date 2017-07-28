@@ -6,7 +6,9 @@ from autologin_middleware import AutologinMiddleware
 
 class DDAutologinMiddleware(AutologinMiddleware):
     def needs_login(self, request, spider):
-        return bool(spider.queue.get_login_credentials(request.url))
+        result = bool(spider.queue.get_login_credentials(request.url))
+        print('needs_login', request, result)
+        return result
 
     def login_request(self, request, spider):
         creds = spider.queue.get_login_credentials(request.url)

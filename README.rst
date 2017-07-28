@@ -195,7 +195,8 @@ desired storage directory via ``-g`` option, e.g.
 Development
 -----------
 
-In order to run tests, you need to have ``redis-server`` running.
+In order to run tests, you need to have ``redis-server`` and
+``autologin-http-api`` (https://github.com/TeamHG-Memex/autologin/) running.
 
 Run tests with ``pytest``::
 
