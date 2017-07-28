@@ -1,38 +1,7 @@
-from __future__ import absolute_import
-
-import redis
-from scrapy.crawler import CrawlerRunner
-from scrapy.settings import Settings
-from scrapy_redis.defaults import SCHEDULER_QUEUE_KEY, SCHEDULER_DUPEFILTER_KEY
 from twisted.web.resource import Resource
 
-import dd_crawler.settings
-from dd_crawler.spiders import BaseSpider
 from .mockserver import MockServer
-from .utils import text_resource, get_path, inlineCallbacks
-
-
-class ATestBaseSpider(BaseSpider):
-    name = 'test_base_spider'  # to have a different queue prefix
-
-
-def make_crawler(spider_cls=ATestBaseSpider, **extra_settings):
-    # clean up queue before starting spider
-    assert spider_cls.name.startswith('test_'), 'pass a special test spider'
-    redis_server = redis.from_url('redis://localhost')
-    name = spider_cls.name
-    redis_server.delete(
-        SCHEDULER_DUPEFILTER_KEY % {'spider': name},
-        *redis_server.keys(
-            SCHEDULER_QUEUE_KEY % {'spider': name} + '*'))
-    print(redis_server.keys('*'))
-
-    settings = Settings()
-    settings.setmodule(dd_crawler.settings)
-    settings['ITEM_PIPELINES']['tests.utils.CollectorPipeline'] = 100
-    settings.update(extra_settings)
-    runner = CrawlerRunner(settings)
-    return runner.create_crawler(spider_cls)
+from .utils import text_resource, get_path, inlineCallbacks, make_crawler
 
 
 class Site(Resource):
