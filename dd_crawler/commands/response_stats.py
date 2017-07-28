@@ -66,7 +66,7 @@ class Command(ScrapyCommand):
 
 def get_rpms(filename: str, response_log: pd.DataFrame,
              step: float, smooth: int) -> Optional[pd.DataFrame]:
-    timestamps = response_log['timestamp']
+    timestamps = response_log['time']
     buffer = []
     if len(timestamps) == 0:
         return
@@ -81,10 +81,10 @@ def get_rpms(filename: str, response_log: pd.DataFrame,
         buffer.append(ts)
     if rpms:
         name = os.path.basename(filename)
-        rpms = pd.DataFrame(rpms, columns=['timestamp', name])
+        rpms = pd.DataFrame(rpms, columns=['time', name])
         if smooth:
             rpms[name] = rpms[name].ewm(span=smooth).mean()
-        rpms.index = pd.to_datetime(rpms.pop('timestamp'), unit='s')
+        rpms.index = pd.to_datetime(rpms.pop('time'), unit='s')
         return rpms
 
 
@@ -143,8 +143,8 @@ def print_scores(response_logs: List[pd.DataFrame], opts):
             len(joined), binary_score.sum(), binary_score.mean(),
             joined['score'].mean()))
     show_domain_stats(joined.copy(), output=opts.output, top=opts.top)
-    joined.sort_values(by='timestamp', inplace=True)
-    joined.index = pd.to_datetime(joined.pop('timestamp'), unit='s')
+    joined.sort_values(by='time', inplace=True)
+    joined.index = pd.to_datetime(joined.pop('time'), unit='s')
     if opts.smooth:
         crawl_time = (joined.index[-1] - joined.index[0]).total_seconds()
         avg_rps = len(joined) / crawl_time
