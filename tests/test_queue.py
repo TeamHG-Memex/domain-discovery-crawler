@@ -8,15 +8,13 @@ import redis
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy.utils.log import configure_logging
-from scrapy_redis.defaults import SCHEDULER_QUEUE_KEY as QUEUE_KEY
+from scrapy_redis.defaults import SCHEDULER_QUEUE_KEY
 
 from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue, \
     BatchSoftmaxQueue
 
 
-# allow test settings from environment
-# TODO - use a custom testing db?
-REDIS_URL = os.environ.get('REDIST_URL', 'redis://localhost')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost')
 
 
 class ATestSpider(Spider):
@@ -26,7 +24,8 @@ class ATestSpider(Spider):
 @pytest.fixture
 def server():
     redis_server = redis.from_url(REDIS_URL)
-    keys = redis_server.keys(QUEUE_KEY % {'spider': ATestSpider.name} + '*')
+    keys = redis_server.keys(
+        SCHEDULER_QUEUE_KEY % {'spider': ATestSpider.name} + '*')
     if keys:
         redis_server.delete(*keys)
     return redis_server
@@ -53,7 +52,7 @@ def make_queue(redis_server, cls: type, slots=None, skip_cache=True, settings=No
     spider = Spider.from_crawler(crawler, 'test_dd_spider')
     if hints:
         spider.hint_urls = hints
-    return cls(server=redis_server, spider=spider, key=QUEUE_KEY,
+    return cls(server=redis_server, spider=spider, key=SCHEDULER_QUEUE_KEY,
                slots_mock=slots, skip_cache=skip_cache)
 
 

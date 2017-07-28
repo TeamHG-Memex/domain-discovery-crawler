@@ -181,8 +181,9 @@ desired storage directory via ``-g`` option, e.g.
 Development
 -----------
 
+In order to run tests, you need to have ``redis-server`` running.
+
 Run tests with ``pytest``::
 
     py.test tests/
 
-Note that coverage is not that great, mostly custom queue is covered.

@@ -15,7 +15,7 @@ from .queue import BaseRequestQueue
 from .utils import dont_increase_depth, setup_profiling, PageClassifier
 
 
-class GeneralSpider(Spider):
+class BaseSpider(Spider):
     name = 'dd_crawler'
 
     def __init__(self, seeds=None, profile=None):
@@ -67,7 +67,7 @@ class GeneralSpider(Spider):
         )
 
 
-class DeepDeepSpider(GeneralSpider):
+class DeepDeepSpider(BaseSpider):
     name = 'deepdeep'
 
     def __init__(self, clf=None, page_clf=None, classifier_input='text', hints=None,
