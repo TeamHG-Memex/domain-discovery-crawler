@@ -38,7 +38,7 @@ def text_resource(content):
         def render_GET(self, request):
             request.setHeader(b'content-type', b'text/html')
             return to_bytes(content)
-    return Page
+    return Page()
 
 
 def find_item(path, items, key='url'):
@@ -64,7 +64,6 @@ def make_crawler(spider_cls=ATestBaseSpider, **extra_settings):
         SCHEDULER_DUPEFILTER_KEY % {'spider': name},
         *redis_server.keys(
             SCHEDULER_QUEUE_KEY % {'spider': name} + '*'))
-    print(redis_server.keys('*'))
 
     settings = Settings()
     settings.setmodule(dd_crawler.settings)
