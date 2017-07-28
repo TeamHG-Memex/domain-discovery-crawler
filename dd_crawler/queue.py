@@ -503,7 +503,7 @@ class BatchSoftmaxQueue(BatchQueue):
                 unique_queues = list(
                     np.array(available_queues)[np.nonzero(p)][:self.batch_size])
                 unique_queues_set = set(unique_queues)
-                while len(unique_queues_set) < min_n_queues:
+                if len(unique_queues_set) < min_n_queues:
                     unique_queues_set.update(np.random.choice(
                         available_queues,
                         size=min(len(available_queues),
