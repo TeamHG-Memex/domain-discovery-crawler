@@ -1,3 +1,5 @@
+import json
+
 from twisted.web.resource import Resource
 
 from .mockserver import MockServer
@@ -20,7 +22,8 @@ class Site(Resource):
 
 @inlineCallbacks
 def test_spider(tmpdir):
-    crawler = make_crawler()
+    log_path = tmpdir.join('log.jl')
+    crawler = make_crawler(RESPONSE_LOG_FILE=str(log_path))
     with MockServer(Site) as s:
         seeds = tmpdir.join('seeds.txt')
         seeds.write(s.root_url)
@@ -29,3 +32,6 @@ def test_spider(tmpdir):
     assert len(spider.collected_items) == 4
     assert {get_path(item['url']) for item in spider.collected_items} == \
            {'/', '/page', '/another-page', '/new-page'}
+    with log_path.open('rt') as f:
+        items = [json.loads(line) for line in f]
+        assert len(items) == len(spider.collected_items)
