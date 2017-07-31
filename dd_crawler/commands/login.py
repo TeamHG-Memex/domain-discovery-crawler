@@ -1,6 +1,16 @@
+from scrapy import Request
 from scrapy.commands import ScrapyCommand
 from scrapy.exceptions import UsageError
 from scrapy_redis.scheduler import Scheduler
+
+
+def add_login(spider, url, login, password):
+    print('Adding login url: {}'.format(url))
+    queue = spider.queue
+    queue.add_login_credentials(url, login, password)
+    # push some known url from this domain to make sure we re-crawl it
+    # while logged-in
+    queue.push(Request(url=url, priority=spider.initial_priority))
 
 
 class Command(ScrapyCommand):
@@ -22,5 +32,4 @@ class Command(ScrapyCommand):
         spider = crawler.spidercls.from_crawler(crawler)
         scheduler.open(spider)
 
-        scheduler.queue.add_login_credentials(url, login, password)
-        print('Added login url: {}'.format(url))
+        add_login(spider, url, login, password)

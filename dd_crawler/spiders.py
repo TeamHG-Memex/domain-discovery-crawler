@@ -39,6 +39,10 @@ class BaseSpider(Spider):
         except AttributeError:
             return None
 
+    @property
+    def initial_priority(self):
+        return int(10 * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
+
     def parse(self, response: Response):
         if not isinstance(response, HtmlResponse):
             return
@@ -103,10 +107,8 @@ class DeepDeepSpider(BaseSpider):
         if not self.page_clf and self.settings.get(
                 'QUEUE_MAX_RELEVANT_DOMAINS'):
             raise NotConfigured('Pass page_clf to spider')
-        initial_priority = int(
-            10 * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
         for request in super().start_requests():
-            request.priority = initial_priority
+            request.priority = self.initial_priority
             if self.queue is not None:
                 self.queue.push(request)
             else:

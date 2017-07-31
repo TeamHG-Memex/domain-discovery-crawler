@@ -3,6 +3,7 @@ import uuid
 from twisted.web.resource import Resource
 from twisted.web.util import Redirect
 
+from dd_crawler.commands.login import add_login
 from .mockserver import MockServer
 from .utils import (
     text_resource, get_path, inlineCallbacks, make_crawler, ATestBaseSpider,
@@ -29,11 +30,9 @@ def authenticated_text(content):
     class R(Resource):
         def render_GET(self, request):
             if not is_authenticated(request):
-                result = Redirect(b'/login').render(request)
+                return Redirect(b'/login').render(request)
             else:
-                result = content.encode()
-            request.write(result)
-            request.finish()
+                return content.encode()
     return R()
 
 
@@ -58,6 +57,8 @@ class LoginSite(Resource):
         isLeaf = True
 
         def render_GET(self, request):
+            if is_authenticated(request):
+                return Redirect(b'/').render(request)
             return (
                 b'<form action="/login" method="POST">'
                 b'<input type="text" name="login">'
@@ -89,8 +90,8 @@ class LoginSite(Resource):
         self.putChild(b'open', text_resource('<a href="/more">more</a>'))
         self.putChild(b'more', text_resource('no more'))
         self.putChild(b'login', self._Login())
-        self.putChild(b'hidden', authenticated_text(b'hidden resource'))
-        self.putChild(b'hidden-2', authenticated_text(b'hidden resource 2'))
+        self.putChild(b'hidden', authenticated_text('hidden resource'))
+        self.putChild(b'hidden-2', authenticated_text('hidden resource 2'))
 
 
 @inlineCallbacks
@@ -101,9 +102,8 @@ def test_no_login(tmpdir):
         seeds.write(s.root_url)
         yield crawler.crawl(seeds=str(seeds))
     spider = crawler.spider
-    assert len(spider.collected_items) == 2
     assert {get_path(item['url']) for item in spider.collected_items} == \
-           {'/', '/login'}
+           {'/', '/login', '/open', '/more'}
 
 
 class ATestLoginSpider(ATestBaseSpider):
@@ -114,10 +114,9 @@ class ATestLoginSpider(ATestBaseSpider):
         self._added_credentials = False
 
     def parse(self, response):
-        print(response.url, get_path(response.url))
+        print('Parsed', get_path(response.url))
         if not self._added_credentials and get_path(response.url) == '/login':
-            self.queue.add_login_credentials(response.url, 'admin', 'secret')
-            print('added')
+            add_login(self, response.url, 'admin', 'secret')
             self._added_credentials = True
         return super().parse(response)
 
@@ -132,5 +131,4 @@ def test_login(tmpdir):
     spider = crawler.spider
     paths = {get_path(item['url']) for item in spider.collected_items}
     print(paths)
-    assert len(spider.collected_items) == 6
-    assert paths == {'/', '/login'}
+    assert {'/more', '/hidden-2', '/open', '/hidden'}.issubset(paths)
