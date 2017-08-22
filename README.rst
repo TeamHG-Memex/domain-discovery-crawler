@@ -181,7 +181,8 @@ desired storage directory via ``-g`` option, e.g.
 Development
 -----------
 
-In order to run tests, you need to have ``redis-server`` running.
+In order to run tests, you need to have ``redis-server`` running,
+and install packages from ``tests/requirements.txt``.
 
 Run tests with ``pytest``::
 
