@@ -1,21 +1,23 @@
-import base64
 from collections import Counter
 import gzip
 import json
 import logging
 import math
 import random
+import struct
 import time
 from typing import Optional, List, Tuple, Union, Dict
 from zlib import crc32
 
 from deepdeep.utils import softmax
+import lib.smaz as smaz
 import numpy as np
+from redis.client import StrictRedis
 from scrapy import Request
 from scrapy_redis.queue import Base
 import tldextract
 
-from .utils import warn_if_slower, cacheforawhile, get_int_or_None, get_domain
+from .utils import warn_if_slower, cacheforawhile, get_int_or_None
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,7 @@ class BaseRequestQueue(Base):
     """
     def __init__(self, *args, slots_mock=None, skip_cache=False, **kwargs):
         super().__init__(*args, **kwargs)
+        assert isinstance(self.server, StrictRedis)
         logging.info('Init {} queue with key {}'.format(type(self), self.key))
         self.len_key = self.fkey('len')  # int
         self.queues_key = self.fkey('queues')  # sorted set
@@ -87,7 +90,7 @@ class BaseRequestQueue(Base):
         data = self._encode_request(request)
         score = -min(request.priority,
                      self.spider.settings.getfloat('DD_MAX_SCORE', np.inf))
-        added = self.server.zadd(queue_key, **{data: score})
+        added = self.server.zadd(queue_key, score, data)
         if added:
             self.server.incr(self.len_key)
         top = self.server.zrange(queue_key, 0, 0, withscores=True)
@@ -306,11 +309,11 @@ class BaseRequestQueue(Base):
             self.server.decr(self.len_key, count)
             if len(results) == n + 1:
                 _, queue_score = results[-1]
-                self.server.zadd(
-                    self.queues_key, **{queue_key.decode('utf8'): queue_score})
+                self.server.zadd(self.queues_key, queue_score, queue_key)
             else:
                 self.remove_empty_queue(queue_key)
-            return [self._decode_request(r) for r, _ in results[:n]]
+            return [self._decode_request_priority(r, -s)
+                    for r, s in results[:n]]
         else:
             # queue was empty: remove it from queues set
             self.remove_empty_queue(queue_key)
@@ -352,33 +355,49 @@ class BaseRequestQueue(Base):
     def fkey(self, s):
         return '{}:{}'.format(self.key, s)
 
-    # This _encode_request and _decode_request are used only in tests,
-    # they are overriden in CompactQueue for production use.
+    def _decode_request_priority(
+            self, encoded_request: bytes, priority: float) -> Request:
+        request = self._decode_request(encoded_request)
+        request.priority = priority
+        return request
 
-    def _encode_request(self, request) -> str:
-        data = super()._encode_request(request)
-        return base64.b64encode(data).decode('ascii')
 
-    def _decode_request(self, encoded_request: str):
-        encoded_request = base64.b64decode(encoded_request)
-        return super()._decode_request(encoded_request)
+# A custom table with symbols commonly occurring in URLs
+# Can be improved a bit (~2%) if built on a large and diverse URL sample.
+smaz_decode = ["http://", "https://", "http://wwww.", "https://wwww.",
+               ".com/", ".com", "?", "%"]
+smaz_decode += [x for x in smaz.DECODE if ' ' not in x and x not in smaz_decode]
+smaz_tree = smaz.make_tree(smaz_decode)
+
+
+def url_compress(url: str) -> bytes:
+    return smaz.compress(url, compression_tree=smaz_tree).encode('latin1')
+
+
+def url_decompress(data: bytes) -> str:
+    return smaz.decompress(data.decode('latin1'), decompress_table=smaz_decode)
 
 
 class CompactQueue(BaseRequestQueue):
     """ A more compact request representation:
-    preserve only url, depth and priority.
+    preserve only url, depth and parent id.
+    Priority is stored and set outside of this method.
     """
+    no_parent = b'\x00' * 16
 
-    def _encode_request(self, request: Request) -> str:
-        return '{} {} {}'.format(
-            int(request.priority),
-            request.meta.get('depth', 0),
-            request.url)
+    def _encode_request(self, request: Request) -> bytes:
+        depth = max(-2**15, min(2**15 - 1, int(request.meta.get('depth', 0))))
+        parent = request.meta.get('parent') or self.no_parent
+        assert isinstance(parent, bytes) and len(parent) == 16
+        return struct.pack('h', depth) + parent + url_compress(request.url)
 
-    def _decode_request(self, encoded_request: bytes) -> Request:
-        priority, depth, url = encoded_request.decode('utf-8').split(' ', 2)
-        return Request(
-            url, priority=int(priority), meta={'depth': int(depth)})
+    def _decode_request(self, data: bytes) -> Request:
+        depth_data, parent, url_data = data[:2], data[2:18], data[18:]
+        depth, = struct.unpack('h', depth_data)
+        if parent == self.no_parent:
+            parent = None
+        url = url_decompress(url_data)
+        return Request(url, meta={'depth': depth, 'parent': parent})
 
 
 class SoftmaxQueue(CompactQueue):

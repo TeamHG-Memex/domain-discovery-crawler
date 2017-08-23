@@ -1,5 +1,7 @@
+import base64
 from functools import lru_cache
-from typing import Iterator, Optional
+import hashlib
+from typing import Iterator, Optional, Union
 
 import autopager
 from deepdeep.predictor import LinkClassifier
@@ -45,9 +47,16 @@ class BaseSpider(Spider):
         if self.settings.getbool('AUTOPAGER'):
             for url in autopager.urls(response):
                 with dont_increase_depth(response):
-                    yield Request(url=url)
+                    yield self._request(url, response)
         for link in self.le.extract_links(response):
-            yield Request(url=link.url)
+            yield self._request(link.url, response)
+
+    def _request(self, url: str, response: HtmlResponse, priority=0) -> Request:
+        return Request(
+            url=url,
+            priority=priority,
+            meta={'parent': _url_hash(response.url, as_bytes=True)},
+        )
 
     def page_item(self, response: HtmlResponse) -> Item:
         media_urls = []
@@ -61,10 +70,24 @@ class BaseSpider(Spider):
             team_name=self.settings.get('CDR_TEAM'),
             objects=media_urls,
             metadata={
+                'id': _url_hash(response.url, as_bytes=False),
                 'depth': response.meta.get('depth'),
                 'priority': response.request.priority,
+                'parent': _url_hash_as_str(response.meta.get('parent')),
             },
         )
+
+
+def _url_hash(url: str, *, as_bytes: bool) -> Union[str, bytes]:
+    url_hash = hashlib.md5(url.encode('utf8')).digest()
+    if not as_bytes:
+        url_hash = _url_hash_as_str(url_hash)
+    return url_hash
+
+
+def _url_hash_as_str(url_hash: Optional[bytes]) -> Optional[str]:
+    if url_hash is not None:
+        return base64.b64encode(url_hash).decode('ascii')
 
 
 class DeepDeepSpider(BaseSpider):
@@ -117,7 +140,7 @@ class DeepDeepSpider(BaseSpider):
         for score, url in urls:
             priority = int(
                 score * self.settings.getfloat('DD_PRIORITY_MULTIPLIER'))
-            yield Request(url, priority=priority)
+            yield self._request(url, response, priority=priority)
 
     @property
     def statsd_client(self):

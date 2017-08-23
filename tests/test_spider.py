@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote
 
 import pytest
 from sklearn.externals import joblib
@@ -7,7 +8,9 @@ from twisted.web.resource import Resource
 from dd_crawler.spiders import DeepDeepSpider
 from .mockserver import MockServer
 from .utils import (
-    text_resource, get_path, inlineCallbacks, make_crawler, ATestBaseSpider)
+    text_resource, get_path, inlineCallbacks, make_crawler, ATestBaseSpider,
+    find_item,
+)
 
 
 class Site(Resource):
@@ -16,12 +19,16 @@ class Site(Resource):
         self.putChild(b'', text_resource(
             '<a href="/page">page</a> '
             '<a href="/another-page">another page</a> '
+            '<a href="/страница">страница</a> '
         ))
         self.putChild(b'page', text_resource(
             '<a href="/another-page">another page</a>'))
         self.putChild(b'another-page', text_resource(
             '<a href="/new-page">new page</a>'))
         self.putChild(b'new-page', text_resource('<a href="/page">page</a>'))
+        self.putChild('страница'.encode('utf8'),
+                      text_resource('<a href="/last">ещё страница</a>'))
+        self.putChild(b'last', text_resource('fin'))
 
 
 class ATestRelevancySpider(DeepDeepSpider):
@@ -43,12 +50,24 @@ def test_spider(tmpdir, spider_cls):
         seeds.write(s.root_url)
         yield crawler.crawl(seeds=str(seeds), **spider_kwargs)
     spider = crawler.spider
-    assert len(spider.collected_items) == 4
+
+    # check collected items
+    assert len(spider.collected_items) == 6
     assert {get_path(item['url']) for item in spider.collected_items} == \
-           {'/', '/page', '/another-page', '/new-page'}
+           {'/', '/page', '/another-page', '/new-page', quote('/страница'),
+            '/last'}
+
+    # check json lines log
     with log_path.open('rt') as f:
         items = [json.loads(line) for line in f]
         assert len(items) == len(spider.collected_items)
+
+    # check parent/child relations
+    find_meta = lambda path: find_item(path, spider.collected_items)['metadata']
+    assert find_meta('/page')['parent'] == find_meta('/')['id']
+    assert find_meta('/new-page')['parent'] != find_meta('/')['id']
+    assert find_meta(quote('/страница'))['parent'] == find_meta('/')['id']
+    assert find_meta('/last')['parent'] == find_meta(quote('/страница'))['id']
 
 
 class PageClf:
