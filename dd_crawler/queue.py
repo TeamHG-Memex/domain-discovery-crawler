@@ -383,16 +383,21 @@ class CompactQueue(BaseRequestQueue):
     preserve only url, depth and parent id.
     Priority is stored and set outside of this method.
     """
+    no_parent = b'\x00' * 16
 
     def _encode_request(self, request: Request) -> bytes:
         depth = max(-2**15, min(2**15 - 1, int(request.meta.get('depth', 0))))
-        return struct.pack('h', depth) + url_compress(request.url)
+        parent = request.meta.get('parent') or self.no_parent
+        assert isinstance(parent, bytes) and len(parent) == 16
+        return struct.pack('h', depth) + parent + url_compress(request.url)
 
     def _decode_request(self, data: bytes) -> Request:
-        depth_data, url_data = data[:2], data[2:]
+        depth_data, parent, url_data = data[:2], data[2:18], data[18:]
         depth, = struct.unpack('h', depth_data)
+        if parent == self.no_parent:
+            parent = None
         url = url_decompress(url_data)
-        return Request(url, meta={'depth': depth})
+        return Request(url, meta={'depth': depth, 'parent': parent})
 
 
 class SoftmaxQueue(CompactQueue):

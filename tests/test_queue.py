@@ -10,6 +10,7 @@ from scrapy.crawler import Crawler
 from scrapy.utils.log import configure_logging
 from scrapy_redis.defaults import SCHEDULER_QUEUE_KEY
 
+from dd_crawler.spiders import _url_hash
 from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue, \
     BatchSoftmaxQueue, url_compress, url_decompress
 
@@ -266,10 +267,16 @@ def test_url_compress():
 
 def test_encode_request(server, queue_cls):
     q = make_queue(server, queue_cls)
-    r = Request('http://example.com/foo', meta={'depth': 123})
+    r = Request(
+        'http://example.com/foo',
+        meta={
+            'depth': 123,
+            'parent': _url_hash('http://example.com', as_bytes=True),
+        })
     r2 = q._decode_request(q._encode_request(r))
     assert r.url == r2.url
     assert r.meta['depth'] == r2.meta['depth']
+    assert r.meta['parent'] == r2.meta['parent']
 
     r = Request('http://example.com/foo', meta={'depth': 2**16})
     r2 = q._decode_request(q._encode_request(r))
