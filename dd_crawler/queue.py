@@ -4,11 +4,13 @@ import json
 import logging
 import math
 import random
+import struct
 import time
 from typing import Optional, List, Tuple, Union, Dict
 from zlib import crc32
 
 from deepdeep.utils import softmax
+import lib.smaz as smaz
 import numpy as np
 from redis.client import StrictRedis
 from scrapy import Request
@@ -360,6 +362,22 @@ class BaseRequestQueue(Base):
         return request
 
 
+# A custom table with symbols commonly occurring in URLs
+# Can be improved a bit (~2%) if built on a large and diverse URL sample.
+smaz_decode = ["http://", "https://", "http://wwww.", "https://wwww.",
+               ".com/", ".com", "?", "%"]
+smaz_decode += [x for x in smaz.DECODE if ' ' not in x and x not in smaz_decode]
+smaz_tree = smaz.make_tree(smaz_decode)
+
+
+def url_compress(url: str) -> bytes:
+    return smaz.compress(url, compression_tree=smaz_tree).encode('latin1')
+
+
+def url_decompress(data: bytes) -> str:
+    return smaz.decompress(data.decode('latin1'), decompress_table=smaz_decode)
+
+
 class CompactQueue(BaseRequestQueue):
     """ A more compact request representation:
     preserve only url, depth and parent id.
@@ -367,13 +385,14 @@ class CompactQueue(BaseRequestQueue):
     """
 
     def _encode_request(self, request: Request) -> bytes:
-        return '{} {}'.format(
-            request.meta.get('depth', 0),
-            request.url).encode('utf8')
+        depth = max(-2**15, min(2**15 - 1, int(request.meta.get('depth', 0))))
+        return struct.pack('h', depth) + url_compress(request.url)
 
-    def _decode_request(self, encoded_request: bytes) -> Request:
-        depth, url = encoded_request.decode('utf-8').split(' ', 2)
-        return Request(url, meta={'depth': int(depth)})
+    def _decode_request(self, data: bytes) -> Request:
+        depth_data, url_data = data[:2], data[2:]
+        depth, = struct.unpack('h', depth_data)
+        url = url_decompress(url_data)
+        return Request(url, meta={'depth': depth})
 
 
 class SoftmaxQueue(CompactQueue):

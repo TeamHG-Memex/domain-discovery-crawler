@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote
 
 import pytest
 from sklearn.externals import joblib
@@ -16,12 +17,15 @@ class Site(Resource):
         self.putChild(b'', text_resource(
             '<a href="/page">page</a> '
             '<a href="/another-page">another page</a> '
+            '<a href="/страница">страница</a> '
         ))
         self.putChild(b'page', text_resource(
             '<a href="/another-page">another page</a>'))
         self.putChild(b'another-page', text_resource(
             '<a href="/new-page">new page</a>'))
         self.putChild(b'new-page', text_resource('<a href="/page">page</a>'))
+        self.putChild('страница'.encode('utf8'),
+                      text_resource('просто страница'))
 
 
 class ATestRelevancySpider(DeepDeepSpider):
@@ -43,9 +47,9 @@ def test_spider(tmpdir, spider_cls):
         seeds.write(s.root_url)
         yield crawler.crawl(seeds=str(seeds), **spider_kwargs)
     spider = crawler.spider
-    assert len(spider.collected_items) == 4
+    assert len(spider.collected_items) == 5
     assert {get_path(item['url']) for item in spider.collected_items} == \
-           {'/', '/page', '/another-page', '/new-page'}
+           {'/', '/page', '/another-page', '/new-page', quote('/страница')}
     with log_path.open('rt') as f:
         items = [json.loads(line) for line in f]
         assert len(items) == len(spider.collected_items)

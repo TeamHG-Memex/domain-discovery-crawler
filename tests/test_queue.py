@@ -11,7 +11,7 @@ from scrapy.utils.log import configure_logging
 from scrapy_redis.defaults import SCHEDULER_QUEUE_KEY
 
 from dd_crawler.queue import BaseRequestQueue, SoftmaxQueue, BatchQueue, \
-    BatchSoftmaxQueue
+    BatchSoftmaxQueue, url_compress, url_decompress
 
 
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost')
@@ -256,6 +256,28 @@ def test_batch_softmax_high_prob(server, priority=10000):
 @pytest.mark.skip
 def test_batch_softmax_degenerate_prob(server):
     test_batch_softmax_high_prob(server, priority=100000000)
+
+
+def test_url_compress():
+    for url in ['http://www.example.com/?foo=%20+',
+                'https://example.ru/~ONLY-ASCII-ALLOWED-HERE']:
+        assert url == url_decompress(url_compress(url))
+
+
+def test_encode_request(server, queue_cls):
+    q = make_queue(server, queue_cls)
+    r = Request('http://example.com/foo', meta={'depth': 123})
+    r2 = q._decode_request(q._encode_request(r))
+    assert r.url == r2.url
+    assert r.meta['depth'] == r2.meta['depth']
+
+    r = Request('http://example.com/foo', meta={'depth': 2**16})
+    r2 = q._decode_request(q._encode_request(r))
+    assert r2.meta['depth'] >= 2**15 - 1
+
+    r = Request('http://example.com/foo', meta={'depth': -2**16})
+    r2 = q._decode_request(q._encode_request(r))
+    assert r2.meta['depth'] <= -2**15
 
 
 def pop_all(q: BaseRequestQueue) -> List[Request]:
