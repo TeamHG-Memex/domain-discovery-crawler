@@ -87,7 +87,7 @@ class BaseRequestQueue(Base):
         data = self._encode_request(request)
         score = -min(request.priority,
                      self.spider.settings.getfloat('DD_MAX_SCORE', np.inf))
-        added = self.server.zadd(queue_key, **{data: score})
+        added = self.server.zadd(queue_key, score, data)
         if added:
             self.server.incr(self.len_key)
         top = self.server.zrange(queue_key, 0, 0, withscores=True)
@@ -352,28 +352,17 @@ class BaseRequestQueue(Base):
     def fkey(self, s):
         return '{}:{}'.format(self.key, s)
 
-    # This _encode_request and _decode_request are used only in tests,
-    # they are overriden in CompactQueue for production use.
-
-    def _encode_request(self, request) -> str:
-        data = super()._encode_request(request)
-        return base64.b64encode(data).decode('ascii')
-
-    def _decode_request(self, encoded_request: str):
-        encoded_request = base64.b64decode(encoded_request)
-        return super()._decode_request(encoded_request)
-
 
 class CompactQueue(BaseRequestQueue):
     """ A more compact request representation:
     preserve only url, depth and priority.
     """
 
-    def _encode_request(self, request: Request) -> str:
+    def _encode_request(self, request: Request) -> bytes:
         return '{} {} {}'.format(
             int(request.priority),
             request.meta.get('depth', 0),
-            request.url)
+            request.url).encode('utf8')
 
     def _decode_request(self, encoded_request: bytes) -> Request:
         priority, depth, url = encoded_request.decode('utf-8').split(' ', 2)
