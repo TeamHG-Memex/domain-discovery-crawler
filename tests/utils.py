@@ -37,7 +37,8 @@ def text_resource(content):
         isLeaf = True
         def render_GET(self, request):
             request.setHeader(b'content-type', b'text/html')
-            return to_bytes(content)
+            request.setHeader(b'charset', b'utf-8')
+            return to_bytes(content, encoding='utf-8')
     return Page()
 
 

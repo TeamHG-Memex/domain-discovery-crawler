@@ -17,3 +17,4 @@ Formasaurus==0.8
 json_lines==0.3.1
 git+https://github.com/TeamHG-Memex/autologin-middleware.git@multidomain
 # deep-deep
+pySmaz==1.0.0
