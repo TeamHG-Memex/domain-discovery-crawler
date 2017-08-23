@@ -307,11 +307,11 @@ class BaseRequestQueue(Base):
             self.server.decr(self.len_key, count)
             if len(results) == n + 1:
                 _, queue_score = results[-1]
-                self.server.zadd(
-                    self.queues_key, **{queue_key.decode('utf8'): queue_score})
+                self.server.zadd(self.queues_key, queue_score, queue_key)
             else:
                 self.remove_empty_queue(queue_key)
-            return [self._decode_request(r) for r, _ in results[:n]]
+            return [self._decode_request_priority(r, -s)
+                    for r, s in results[:n]]
         else:
             # queue was empty: remove it from queues set
             self.remove_empty_queue(queue_key)
@@ -353,22 +353,27 @@ class BaseRequestQueue(Base):
     def fkey(self, s):
         return '{}:{}'.format(self.key, s)
 
+    def _decode_request_priority(
+            self, encoded_request: bytes, priority: float) -> Request:
+        request = self._decode_request(encoded_request)
+        request.priority = priority
+        return request
+
 
 class CompactQueue(BaseRequestQueue):
     """ A more compact request representation:
-    preserve only url, depth and priority.
+    preserve only url, depth and parent id.
+    Priority is stored and set outside of this method.
     """
 
     def _encode_request(self, request: Request) -> bytes:
-        return '{} {} {}'.format(
-            int(request.priority),
+        return '{} {}'.format(
             request.meta.get('depth', 0),
             request.url).encode('utf8')
 
     def _decode_request(self, encoded_request: bytes) -> Request:
-        priority, depth, url = encoded_request.decode('utf-8').split(' ', 2)
-        return Request(
-            url, priority=int(priority), meta={'depth': int(depth)})
+        depth, url = encoded_request.decode('utf-8').split(' ', 2)
+        return Request(url, meta={'depth': int(depth)})
 
 
 class SoftmaxQueue(CompactQueue):
