@@ -4,7 +4,7 @@ from typing import List
 from urllib.parse import urlsplit
 
 import pytest
-import redis
+from redis.client import StrictRedis
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy.utils.log import configure_logging
@@ -23,7 +23,7 @@ class ATestSpider(Spider):
 
 @pytest.fixture
 def server():
-    redis_server = redis.from_url(REDIS_URL)
+    redis_server = StrictRedis.from_url(REDIS_URL)
     keys = redis_server.keys(
         SCHEDULER_QUEUE_KEY % {'spider': ATestSpider.name} + '*')
     if keys:

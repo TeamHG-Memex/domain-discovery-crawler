@@ -1,4 +1,3 @@
-import base64
 from collections import Counter
 import gzip
 import json
@@ -11,11 +10,12 @@ from zlib import crc32
 
 from deepdeep.utils import softmax
 import numpy as np
+from redis.client import StrictRedis
 from scrapy import Request
 from scrapy_redis.queue import Base
 import tldextract
 
-from .utils import warn_if_slower, cacheforawhile, get_int_or_None, get_domain
+from .utils import warn_if_slower, cacheforawhile, get_int_or_None
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ class BaseRequestQueue(Base):
     """
     def __init__(self, *args, slots_mock=None, skip_cache=False, **kwargs):
         super().__init__(*args, **kwargs)
+        assert isinstance(self.server, StrictRedis)
         logging.info('Init {} queue with key {}'.format(type(self), self.key))
         self.len_key = self.fkey('len')  # int
         self.queues_key = self.fkey('queues')  # sorted set
