@@ -358,7 +358,7 @@ class BaseRequestQueue(Base):
     def _decode_request_priority(
             self, encoded_request: bytes, priority: float) -> Request:
         request = self._decode_request(encoded_request)
-        request.priority = priority
+        request.priority = int(priority)
         return request
 
 

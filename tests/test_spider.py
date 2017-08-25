@@ -4,6 +4,7 @@ from urllib.parse import quote
 import pytest
 from sklearn.externals import joblib
 from twisted.web.resource import Resource
+from twisted.web.util import redirectTo
 
 from dd_crawler.spiders import DeepDeepSpider
 from .mockserver import MockServer
@@ -21,13 +22,20 @@ class Site(Resource):
             '<a href="/another-page">another page</a> '
             '<a href="/страница">страница</a> '
         ))
+
+        class RedirectToLast(Resource):
+            isLeaf = True
+            def render_GET(self, request):
+                return redirectTo(b'last', request)
+
         self.putChild(b'page', text_resource(
             '<a href="/another-page">another page</a>'))
         self.putChild(b'another-page', text_resource(
             '<a href="/new-page">new page</a>'))
         self.putChild(b'new-page', text_resource('<a href="/page">page</a>'))
         self.putChild('страница'.encode('utf8'),
-                      text_resource('<a href="/last">ещё страница</a>'))
+                      text_resource('<a href="/redirect">ещё страница</a>'))
+        self.putChild(b'redirect', RedirectToLast())
         self.putChild(b'last', text_resource('fin'))
 
 
