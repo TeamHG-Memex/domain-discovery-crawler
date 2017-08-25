@@ -46,6 +46,8 @@ class RequestLogMiddleware:
         log_entry = {
             'time': time.time(),
             'url': response.url,
+            'id': metadata.get('id'),
+            'parent': metadata.get('parent'),
             'depth': response.meta.get('depth', ''),
             'priority': response.request.priority,
             'score': score,
