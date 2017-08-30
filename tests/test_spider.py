@@ -21,6 +21,7 @@ class Site(Resource):
             '<a href="/page">page</a> '
             '<a href="/another-page">another page</a> '
             '<a href="/страница">страница</a> '
+            '<a href="http://external">dead</a> '
         ))
 
         class RedirectToLast(Resource):
