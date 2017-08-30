@@ -15,10 +15,9 @@ import numpy as np
 from redis.client import StrictRedis
 from scrapy import Request
 from scrapy_redis.queue import Base
-import tldextract
 
 from .signals import queues_changed
-from .utils import warn_if_slower, cacheforawhile, get_int_or_None
+from .utils import warn_if_slower, cacheforawhile, get_int_or_None, get_domain
 
 
 logger = logging.getLogger(__name__)
@@ -340,8 +339,7 @@ class BaseRequestQueue(Base):
     def url_queue_key(self, url: str) -> str:
         """ Key for request queue (based on it's SLD).
         """
-        domain = tldextract.extract(url).registered_domain.lower()
-        return self.fkey('domain:{}'.format(domain))
+        return self.fkey('domain:{}'.format(get_domain(url)))
 
     def queue_key_domain(self, queue_key: bytes) -> str:
         queue_key = queue_key.decode('utf8')

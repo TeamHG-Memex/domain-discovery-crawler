@@ -40,6 +40,7 @@ DOWNLOADER_MIDDLEWARES = {
     'proxy_middleware.ProxyOnlyTorMiddleware': 10,
     'scrapy.downloadermiddlewares.redirect.RedirectMiddleware': None,
     'dd_crawler.middleware.domains.ForbidOffsiteRedirectsMiddleware': 600,
+    'dd_crawler.middleware.domain_status.DomainStatusMiddleware': 1000,
 }
 
 MAX_DUPLICATE_PATH_SEGMENTS = 5

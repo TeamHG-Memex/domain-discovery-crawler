@@ -60,7 +60,7 @@ def test_spider(tmpdir, spider_cls, domain_limit):
                            DOMAIN_LIMIT=int(domain_limit))
     with MockServer(Site) as s:
         seeds = tmpdir.join('seeds.txt')
-        seeds.write(s.root_url)
+        seeds.write('\n'.join([s.root_url, 'http://not-localhost']))
         yield crawler.crawl(seeds=str(seeds), **spider_kwargs)
     spider = crawler.spider
 
@@ -81,6 +81,14 @@ def test_spider(tmpdir, spider_cls, domain_limit):
     assert find_meta('/new-page')['parent'] != find_meta('/')['id']
     assert find_meta(quote('/страница'))['parent'] == find_meta('/')['id']
     assert find_meta('/last')['parent'] == find_meta(quote('/страница'))['id']
+
+    if domain_limit:
+        states = [item['domain_state'] for item in items
+                  if 'domain_state' in item]
+        s0, s1 = states
+        assert s0['localhost'] == 'running'
+        assert s0['not-localhost'] in {'running', 'failed'}
+        assert s1 == {'localhost': 'finished', 'not-localhost': 'failed'}
 
 
 class PageClf:
