@@ -17,7 +17,7 @@ from scrapy import Request
 from scrapy_redis.queue import Base
 
 from .signals import queues_changed
-from .utils import warn_if_slower, cacheforawhile, get_int_or_None, get_domain
+from .utils import warn_if_slower, cacheforawhile, get_domain
 
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,6 @@ class BaseRequestQueue(Base):
         self.queues_key = self.fkey('queues')  # sorted set
         self.relevant_queues_key = self.fkey('relevant-queues')  # sorted set
         self.did_restrict_key = self.fkey('did-restrict-domains')  # bool
-        # set of hint urls, filled from outside
-        self.hints_key = self.fkey('hint-urls')
         # set of domains with login form found
         self.has_login_form_key = self.fkey('login-form-domains')
         # hash with domain as key and json-encoded credentials as value
@@ -66,13 +64,11 @@ class BaseRequestQueue(Base):
                 'QUEUE_MAX_DOMAINS has a bug: '
                 'domains which queue becomes empty during crawling '
                 'can disappear from the domain queue.')
-        self.max_relevant_domains = (
-            get_int_or_None(settings, 'QUEUE_MAX_RELEVANT_DOMAINS'))
+        self.max_relevant_domains = \
+            settings.getint('QUEUE_MAX_RELEVANT_DOMAINS')
         self.set_spider_domain_limit()
         self.start_time = time.time()
         self.restrict_delay = settings.getint('RESTRICT_DELAY', 3600)  # seconds
-        if getattr(self.spider, 'hint_urls', None):
-            self.add_hint_urls(self.spider.hint_urls)
 
     def __len__(self):
         return int(self.server.get(self.len_key) or '0')
@@ -136,8 +132,7 @@ class BaseRequestQueue(Base):
     def clear(self):
         logging.info('Clearing all keys for {}'.format(self.key))
         keys = {self.len_key, self.queues_key, self.relevant_queues_key,
-                self.did_restrict_key, self.workers_key, self.worker_id_key,
-                self.hints_key}
+                self.did_restrict_key, self.workers_key, self.worker_id_key}
         keys.update(self.get_workers())
         keys.update(self.get_queues())
         self.server.delete(*keys)
@@ -151,35 +146,17 @@ class BaseRequestQueue(Base):
         if (self.restrict_domanis
             and not self.did_restrict_domains
             and time.time() - self.start_time > self.restrict_delay
-            and (self.max_relevant_domains == 0
-                 or self.server.zcard(self.relevant_queues_key) >=
-                    self.max_relevant_domains)):
-            selected_relevant = {
-                self.url_queue_key(url.decode('utf8')).encode('utf8')
-                for url in self.server.smembers(self.hints_key)}
-            n_hints = len(selected_relevant)
-            if self.max_relevant_domains > 0:
-                selected_relevant.update(self.server.zrange(
-                    self.relevant_queues_key, 0, self.max_relevant_domains - 1))
+            and self.server.zcard(self.relevant_queues_key) >=
+                self.max_relevant_domains):
+            selected_relevant = set(self.server.zrange(
+                self.relevant_queues_key, 0, self.max_relevant_domains - 1))
             irrelevant = (set(self.server.zrange(self.queues_key, 0, -1)) -
                           selected_relevant)
             logger.info(
-                'Removing {:,} irrelevant domains. '
-                '{:,} relevant domains left, including {:,} hinted domains'
-                .format(len(irrelevant), len(selected_relevant), n_hints))
+                'Removing {:,} irrelevant domains. {:,} relevant domains left'
+                .format(len(irrelevant), len(selected_relevant)))
             self.server.zrem(self.queues_key, *irrelevant)
             self.server.set(self.did_restrict_key, b'1')
-
-    def add_hint_urls(self, hint_urls: List[str]):
-        for url in hint_urls:
-            self.add_hint_url(url)
-        logging.info('Added {} initial hint urls'.format(len(hint_urls)))
-
-    def add_hint_url(self, url: str):
-        self.server.sadd(self.hints_key, url.encode('utf8'))
-
-    def remove_hint_url(self, url: str):
-        self.server.srem(self.hints_key, url.encode('utf8'))
 
     def set_spider_domain_limit(self):
         """ Set domain_limit attribute on the spider: it is read by middlewares
@@ -387,7 +364,7 @@ class BaseRequestQueue(Base):
 
     @property
     def restrict_domanis(self):
-        return self.max_relevant_domains is not None
+        return self.max_relevant_domains > 0
 
     def fkey(self, s):
         return '{}:{}'.format(self.key, s)

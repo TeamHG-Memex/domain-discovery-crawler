@@ -85,13 +85,6 @@ def dont_increase_depth(response):
         response.meta['depth'] += 1
 
 
-def get_int_or_None(settings: Settings, key: str) -> Optional[int]:
-    value = settings.get(key)
-    if value is None or value == '':
-        return None
-    return int(value)
-
-
 def setup_profiling(profile):
     file, filename = None, None
 

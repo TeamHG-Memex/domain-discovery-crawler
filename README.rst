@@ -45,8 +45,6 @@ Arguments:
   should be ``text`` if ``page_clf`` takes text as input,
   or ``text_url`` if ``page_clf`` takes a dict with "text" and "url" keys
   as input.
-- ``hints`` (optional): a text file with urls to always leave in relevant domains
-  if ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
 
 Settings:
 
@@ -63,9 +61,7 @@ Settings:
   the specified number of relevant ones (but not earlier than
   ``RESTRICT_DELAY``, 1 hour by default), and does not go to new domains any more.
   If more relevant domains were discovered before ``RESTRICT_DELAY``, most
-  relevant are selected accoring to sum of squares of relevant page scores.
-  If ``QUEUE_MAX_RELEVANT_DOMAINS``, only hints (see below) are left after
-  ``RESTRICT_DELAY``.
+  relevant are selected according to sum of squares of relevant page scores.
 - ``PAGE_RELEVANCY_THRESHOLD`` - a threshold when page (and thus the domain)
   is considered relevant, which is used when ``QUEUE_MAX_RELEVANT_DOMAINS`` is set.
 - ``STATS_CLASS`` - set to ``'scrapy_statsd.statscollectors.StatsDStatsCollector'``
@@ -80,14 +76,6 @@ Settings:
 - ``AUTOLOGIN_ENABLED`` - set to enable autologin support (see a separate section
   below).
 - ``AUTOLOGIN_URL`` - set autologin HTTP API url.
-
-When ``QUEUE_MAX_RELEVANT_DOMAINS`` is defined (even if it's zero),
-hints are also taken into account.
-After broad crawling for ``RESTRICT_DELAY`` seconds, only hints and
-top ``QUEUE_MAX_RELEVANT_DOMAINS`` domains are crawled.
-Hints can be passed either via ``hints`` spider argument, or added/removed
-on the fly using the ``scrapy hint <spider> (pin|unpin) <url>`` command.
-They are stored as utf8-encoded urls in ``BaseRequestQueue.hints_key`` redis set.
 
 For redis connection settings, refer to scrapy-redis docs.
 
