@@ -74,7 +74,8 @@ def test_spider(tmpdir, spider_cls, domain_limit):
     # check json lines log
     with log_path.open('rt') as f:
         items = [json.loads(line) for line in f]
-        assert len(items) == len(spider.collected_items)
+        url_items = [it for it in items if 'url' in it]
+        assert len(url_items) == len(spider.collected_items)
 
     # check parent/child relations
     find_meta = lambda path: find_item(path, spider.collected_items)['metadata']
@@ -86,10 +87,12 @@ def test_spider(tmpdir, spider_cls, domain_limit):
     if domain_limit:
         states = [item['domain_state'] for item in items
                   if 'domain_state' in item]
-        s0, s1 = states
-        assert s0['localhost'] == 'running'
-        assert s0['not-localhost'] in {'running', 'failed'}
-        assert s1 == {'localhost': 'finished', 'not-localhost': 'failed'}
+        assert states[-1] == {
+            'global_open_queues': [],
+            'worker_failures': ['not-localhost'],
+            'worker_in_flight': [],
+            'worker_successes': ['localhost'],
+        }
 
 
 class PageClf:
