@@ -15,9 +15,9 @@ import numpy as np
 from redis.client import StrictRedis
 from scrapy import Request
 from scrapy_redis.queue import Base
-import tldextract
 
-from .utils import warn_if_slower, cacheforawhile, get_int_or_None
+from .signals import queues_changed
+from .utils import warn_if_slower, cacheforawhile, get_int_or_None, get_domain
 
 
 logger = logging.getLogger(__name__)
@@ -103,11 +103,7 @@ class BaseRequestQueue(Base):
         else:  # a race during domain re-balancing: do not care about score much
             logger.warning('Placing a possibly incorrect queue score')
             queue_score = score
-        queue_added = self.server.zadd(
-            self.queues_key, **{queue_key: queue_score})
-        self.update_queue_stats(update_domains=queue_added)
-        if queue_added:
-            logger.debug('ADD queue {}'.format(queue_key))
+        self.add_queue(queue_key, queue_score)
         return True
 
     def pop(self, timeout=0) -> Optional[Request]:
@@ -119,11 +115,20 @@ class BaseRequestQueue(Base):
                 return results[0]
 
     def update_queue_stats(self, update_domains=True):
-        stats = self.spider.crawler.stats
+        crawler = self.spider.crawler
+        stats = crawler.stats
         stats.set_value('dd_crawler/queue/urls', len(self))
         if update_domains:
-            stats.set_value('dd_crawler/queue/domains',
-                            self.server.zcard(self.queues_key))
+            n_domains_key = 'dd_crawler/queue/domains'
+            prev_n_domains = stats.get_value(n_domains_key)
+            n_domains = self.server.zcard(self.queues_key)
+            if prev_n_domains != n_domains:
+                # In theory it can happen that domains changed but count stayed
+                # the same due to a race conditions with other workers.
+                # In practice this is not an issue.
+                crawler.signals.send_catch_log_deferred(
+                    signal=queues_changed, queue=self)
+                stats.set_value(n_domains_key, n_domains)
             if self.max_relevant_domains:
                 stats.set_value('dd_crawler/queue/relevant_domains',
                                 self.server.zcard(self.relevant_queues_key))
@@ -140,8 +145,6 @@ class BaseRequestQueue(Base):
 
     def get_queues(self, withscores=False
                    ) -> Union[List[bytes], List[Tuple[bytes, float]]]:
-        self.try_to_restrict_domains()
-        self.set_spider_domain_limit()
         return self.server.zrange(self.queues_key, 0, -1, withscores=withscores)
 
     def try_to_restrict_domains(self):
@@ -217,7 +220,7 @@ class BaseRequestQueue(Base):
             if self.server.zcard(queue):
                 return queue
             else:
-                self.remove_empty_queue(queue)
+                self.remove_queue(queue)
 
     def select_best_queue(self, idx: int, n_idx: int) -> Optional[bytes]:
         """ Select queue to crawl from, taking free slots into account.
@@ -256,6 +259,8 @@ class BaseRequestQueue(Base):
         """ Get queues belonging to this worker.
         Here we cache not only expensive redis call, but queue selection too.
         """
+        self.try_to_restrict_domains()
+        self.set_spider_domain_limit()
         queues = self.get_queues(withscores=True)
         my_queues, my_scores = [], []
         for q, s in queues:
@@ -315,25 +320,30 @@ class BaseRequestQueue(Base):
                 _, queue_score = results[-1]
                 self.server.zadd(self.queues_key, queue_score, queue_key)
             else:
-                self.remove_empty_queue(queue_key)
+                self.remove_queue(queue_key)
             return [self._decode_request_priority(r, -s)
                     for r, s in results[:n]]
         else:
             # queue was empty: remove it from queues set
-            self.remove_empty_queue(queue_key)
+            self.remove_queue(queue_key)
             return []
 
-    def remove_empty_queue(self, queue_key: bytes) -> None:
-        # FIXME - maybe we should not remove empty queue keys? That can be racy
+    def add_queue(self, queue_key, queue_score: float):
+        added = self.server.zadd(self.queues_key, queue_score, queue_key)
+        self.update_queue_stats(update_domains=added)
+        if added:
+            logger.debug('ADD queue {}'.format(queue_key))
+
+    def remove_queue(self, queue_key: bytes) -> None:
         removed = self.server.zrem(self.queues_key, queue_key)
+        self.update_queue_stats(update_domains=removed)
         if removed:
             logger.debug('REM queue {}'.format(queue_key))
 
     def url_queue_key(self, url: str) -> str:
         """ Key for request queue (based on it's SLD).
         """
-        domain = tldextract.extract(url).registered_domain.lower()
-        return self.fkey('domain:{}'.format(domain))
+        return self.fkey('domain:{}'.format(get_domain(url)))
 
     def queue_key_domain(self, queue_key: bytes) -> str:
         queue_key = queue_key.decode('utf8')
@@ -385,7 +395,7 @@ class BaseRequestQueue(Base):
     def _decode_request_priority(
             self, encoded_request: bytes, priority: float) -> Request:
         request = self._decode_request(encoded_request)
-        request.priority = priority
+        request.priority = int(priority)
         return request
 
 

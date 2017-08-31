@@ -4,6 +4,7 @@ from urllib.parse import quote
 import pytest
 from sklearn.externals import joblib
 from twisted.web.resource import Resource
+from twisted.web.util import redirectTo
 
 from dd_crawler.spiders import DeepDeepSpider
 from .mockserver import MockServer
@@ -20,14 +21,22 @@ class Site(Resource):
             '<a href="/page">page</a> '
             '<a href="/another-page">another page</a> '
             '<a href="/страница">страница</a> '
+            '<a href="http://external">dead</a> '
         ))
+
+        class RedirectToLast(Resource):
+            isLeaf = True
+            def render_GET(self, request):
+                return redirectTo(b'last', request)
+
         self.putChild(b'page', text_resource(
             '<a href="/another-page">another page</a>'))
         self.putChild(b'another-page', text_resource(
             '<a href="/new-page">new page</a>'))
         self.putChild(b'new-page', text_resource('<a href="/page">page</a>'))
         self.putChild('страница'.encode('utf8'),
-                      text_resource('<a href="/last">ещё страница</a>'))
+                      text_resource('<a href="/redirect">ещё страница</a>'))
+        self.putChild(b'redirect', RedirectToLast())
         self.putChild(b'last', text_resource('fin'))
 
 
@@ -36,18 +45,23 @@ class ATestRelevancySpider(DeepDeepSpider):
 
 
 @pytest.mark.parametrize(
-    ['spider_cls'], [[ATestBaseSpider], [ATestRelevancySpider]])
+    ['spider_cls', 'domain_limit'],
+    [[ATestBaseSpider, True],
+     [ATestBaseSpider, False],
+     [ATestRelevancySpider, False],
+     ])
 @inlineCallbacks
-def test_spider(tmpdir, spider_cls):
+def test_spider(tmpdir, spider_cls, domain_limit):
     log_path = tmpdir.join('log.jl')
     spider_kwargs = {}
     if spider_cls is ATestRelevancySpider:
         spider_kwargs.update(relevancy_models(tmpdir))
     crawler = make_crawler(spider_cls=spider_cls,
-                           RESPONSE_LOG_FILE=str(log_path))
+                           RESPONSE_LOG_FILE=str(log_path),
+                           DOMAIN_LIMIT=int(domain_limit))
     with MockServer(Site) as s:
         seeds = tmpdir.join('seeds.txt')
-        seeds.write(s.root_url)
+        seeds.write('\n'.join([s.root_url, 'http://not-localhost']))
         yield crawler.crawl(seeds=str(seeds), **spider_kwargs)
     spider = crawler.spider
 
@@ -60,7 +74,8 @@ def test_spider(tmpdir, spider_cls):
     # check json lines log
     with log_path.open('rt') as f:
         items = [json.loads(line) for line in f]
-        assert len(items) == len(spider.collected_items)
+        url_items = [it for it in items if 'url' in it]
+        assert len(url_items) == len(spider.collected_items)
 
     # check parent/child relations
     find_meta = lambda path: find_item(path, spider.collected_items)['metadata']
@@ -68,6 +83,16 @@ def test_spider(tmpdir, spider_cls):
     assert find_meta('/new-page')['parent'] != find_meta('/')['id']
     assert find_meta(quote('/страница'))['parent'] == find_meta('/')['id']
     assert find_meta('/last')['parent'] == find_meta(quote('/страница'))['id']
+
+    if domain_limit:
+        states = [item['domain_state'] for item in items
+                  if 'domain_state' in item]
+        assert states[-1] == {
+            'global_open_queues': [],
+            'worker_failures': ['not-localhost'],
+            'worker_in_flight': [],
+            'worker_successes': ['localhost'],
+        }
 
 
 class PageClf:

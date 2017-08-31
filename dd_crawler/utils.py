@@ -1,16 +1,15 @@
 import contextlib
 from functools import lru_cache
 import logging
-import re
 import os.path
 import signal
 import time
-from urllib.parse import urlsplit
 from typing import Optional
 
 import html_text
 from scrapy.settings import Settings
 from sklearn.externals import joblib
+import tldextract
 import vmprof
 
 
@@ -69,8 +68,11 @@ def cacheforawhile(method):
 
 
 def get_domain(url):
-    domain = urlsplit(url).netloc
-    return re.sub(r'^www\.', '', domain)
+    parsed = tldextract.extract(url)
+    domain = parsed.registered_domain
+    if not domain:  # e.g. localhost which is used in tests
+        domain = '.'.join(filter(None, [parsed.domain, parsed.suffix]))
+    return domain.lower()
 
 
 @contextlib.contextmanager

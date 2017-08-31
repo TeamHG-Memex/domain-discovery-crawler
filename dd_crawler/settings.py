@@ -46,6 +46,7 @@ DOWNLOADER_MIDDLEWARES = {
     'dd_crawler.middleware.DDAutologinMiddleware': 605,
     'scrapy.downloadermiddlewares.cookies.CookiesMiddleware': None,
     'autologin_middleware.ExposeCookiesMiddleware': 700,
+    'dd_crawler.middleware.domain_status.DomainStatusMiddleware': 1000,
 }
 
 MAX_DUPLICATE_PATH_SEGMENTS = 5
