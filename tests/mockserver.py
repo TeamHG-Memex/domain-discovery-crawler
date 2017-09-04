@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import argparse
-import socket
 import sys
 import time
 from subprocess import Popen, PIPE
