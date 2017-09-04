@@ -60,6 +60,8 @@ class RequestLogMiddleware:
         }
         if metadata.get('has_login_form'):
             log_entry['has_login_form'] = True
+        if 'autologin_active' in response.meta:
+            log_entry['login_success'] = response.meta['autologin_active']
         self.jl_logger.write_entry(log_entry)
 
 

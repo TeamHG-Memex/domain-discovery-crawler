@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from twisted.web.resource import Resource
@@ -123,7 +124,9 @@ class ATestLoginSpider(ATestBaseSpider):
 
 @inlineCallbacks
 def test_login(tmpdir):
-    crawler = make_crawler(ATestLoginSpider, AUTOLOGIN_ENABLED=True)
+    log_path = tmpdir.join('log.jl')
+    crawler = make_crawler(ATestLoginSpider, AUTOLOGIN_ENABLED=True,
+                           RESPONSE_LOG_FILE=str(log_path))
     with MockServer(LoginSite) as s:
         seeds = tmpdir.join('seeds.txt')
         seeds.write(s.root_url)
@@ -132,3 +135,9 @@ def test_login(tmpdir):
     paths = {get_path(item['url']) for item in spider.collected_items}
     print(paths)
     assert {'/more', '/hidden-2', '/open', '/hidden'}.issubset(paths)
+
+    # check json lines log
+    with log_path.open('rt') as f:
+        log_items = [json.loads(line) for line in f]
+    assert any(item.get('has_login_form') for item in log_items)
+    assert any(item.get('login_success') for item in log_items)
