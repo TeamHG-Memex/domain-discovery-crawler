@@ -9,7 +9,8 @@ RUN pip install -U pip setuptools wheel && \
     pip install numpy pandas scrapy
 
 COPY ./requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt && \
+    formasaurus init
 
 COPY ./docker/deep-deep-0.0.tar.gz .
 RUN pip install deep-deep-0.0.tar.gz
