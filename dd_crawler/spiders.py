@@ -1,6 +1,8 @@
 import base64
+import json
 from functools import lru_cache
 import hashlib
+from pathlib import Path
 from typing import Iterator, Optional, Union
 
 import autopager
@@ -21,18 +23,30 @@ from .utils import dont_increase_depth, setup_profiling, PageClassifier
 class BaseSpider(Spider):
     name = 'dd_crawler'
 
-    def __init__(self, seeds=None, profile=None):
+    def __init__(self, seeds=None, login_credentials=None, profile=None):
         super().__init__()
         self.le = LinkExtractor(canonicalize=False)
         self.files_le = LinkExtractor(deny_extensions=[], canonicalize=False)
         self.images_le = LinkExtractor(
             tags=['img'], attrs=['src'], deny_extensions=[], canonicalize=False)
         if seeds:
-            with open(seeds) as f:
+            with Path(seeds).open('rt', encoding='utf8') as f:
                 self.start_urls = [url for url in (line.strip() for line in f)
                                    if not url.startswith('#')]
+        if login_credentials:
+            with Path(login_credentials).open('rt', encoding='utf8') as f:
+                self.login_credentials = json.load(f)
+        else:
+            self.login_credentials = None
         if profile:
             setup_profiling(profile)
+
+    def start_requests(self):
+        if self.login_credentials:
+            for cred in self.login_credentials:
+                self.queue.add_login_credentials(
+                    cred['url'], cred['login'], cred['password'])
+        yield from super().start_requests()
 
     @property
     def queue(self) -> Optional[BaseRequestQueue]:

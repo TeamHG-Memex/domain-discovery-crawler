@@ -15,6 +15,6 @@ proxy-middleware
 html_text==0.2.1
 Formasaurus==0.8
 json_lines==0.3.1
-git+https://github.com/TeamHG-Memex/autologin-middleware.git@multidomain
+git+https://github.com/TeamHG-Memex/autologin-middleware.git@fc8cafa7ee49864e94f8b3bff311429fedc211dd
 # deep-deep
 pySmaz==1.0.0
