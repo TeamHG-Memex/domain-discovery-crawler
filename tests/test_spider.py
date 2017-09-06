@@ -45,23 +45,20 @@ class ATestRelevancySpider(DeepDeepSpider):
 
 
 @pytest.mark.parametrize(
-    ['spider_cls', 'domain_limit', 'idle_before_close'],
-    [[ATestBaseSpider, True, 0],
-     [ATestBaseSpider, True, 2],
-     [ATestBaseSpider, False, 0],
-     [ATestRelevancySpider, False, 0],
+    ['spider_cls', 'domain_limit'],
+    [[ATestBaseSpider, True],
+     [ATestBaseSpider, False],
+     [ATestRelevancySpider, False],
      ])
 @inlineCallbacks
-def test_spider(tmpdir, spider_cls, domain_limit, idle_before_close):
+def test_spider(tmpdir, spider_cls, domain_limit):
     log_path = tmpdir.join('log.jl')
     spider_kwargs = {}
     if spider_cls is ATestRelevancySpider:
         spider_kwargs.update(relevancy_models(tmpdir))
     crawler = make_crawler(spider_cls=spider_cls,
                            RESPONSE_LOG_FILE=str(log_path),
-                           DOMAIN_LIMIT=int(domain_limit),
-                           SCHEDULER_IDLE_BEFORE_CLOSE=idle_before_close,
-                           )
+                           DOMAIN_LIMIT=int(domain_limit))
     with MockServer(Site) as s:
         seeds = tmpdir.join('seeds.txt')
         seeds.write('\n'.join([s.root_url, 'http://not-localhost']))

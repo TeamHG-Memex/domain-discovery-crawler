@@ -102,7 +102,6 @@ class BaseRequestQueue(Base):
         self.add_queue(queue_key, queue_score)
         return True
 
-    # completely overriden in BatchQueue
     def pop(self, timeout=0) -> Optional[Request]:
         self.update_queue_stats()
         queue_key = self.select_queue_key()
@@ -455,16 +454,10 @@ class BatchQueue(CompactQueue):
 
     def pop(self, timeout=0) -> Optional[Request]:
         self.update_queue_stats()
-        t0 = time.time()
-        while True:
-            self.local_queue = self.local_queue or self.pop_multi()
-            if self.local_queue:
-                # TODO - take free slots into account
-                return self.local_queue.pop()
-            if timeout == 0 or time.time() - t0 > timeout:
-                return None
-            else:
-                time.sleep(1)
+        self.local_queue = self.local_queue or self.pop_multi()
+        if self.local_queue:
+            # TODO - take free slots into account
+            return self.local_queue.pop()
 
     def pop_multi(self) -> List[Request]:
         idx, n_idx = self.discover()
