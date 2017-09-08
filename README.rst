@@ -45,6 +45,8 @@ Arguments:
   should be ``text`` if ``page_clf`` takes text as input,
   or ``text_url`` if ``page_clf`` takes a dict with "text" and "url" keys
   as input.
+- ``login_credentials`` (optional): path to a file with login credentials
+  in JSON: a list of dicts with "url", "login" and "password" fields.
 
 Settings:
 
@@ -111,10 +113,12 @@ Autologin support
 
 When autologin is enabled (``AUTOLOGIN_ENABLED`` is set), each domain is checked
 for login forms - results of the checks are written to ``RESPONSE_LOG_FILE``
-(into the ``metadata.has_login_form`` field), and stored in Redis.
-If credentials are added via the ``scrapy login`` command,
-which adds them to redis, an attempt to log in to the site will
+(into the ``has_login_form`` field), and stored in Redis.
+If credentials are added via the ``scrapy login`` command, they are
+added to redis, and an attempt to log in to the site is
 be made. If successful, the crawl of this domain will continue while logged in.
+Result of this attempt and current login state is written into
+``login_success`` field in ``RESPONSE_LOG_FILE``.
 
 
 Using docker
@@ -184,7 +188,7 @@ Development
 -----------
 
 In order to run tests, you need
-and install packages from ``tests/requirements.txt``,
+to install packages from ``tests/requirements.txt``,
 and have  ``redis-server`` and
 ``autologin-http-api`` (https://github.com/TeamHG-Memex/autologin/) running.
 

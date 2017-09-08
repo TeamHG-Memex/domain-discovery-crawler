@@ -1,9 +1,6 @@
 from autologin_middleware import AutologinMiddleware
 
 
-# TODO - weakref cache for get_login_credentials
-
-
 class DDAutologinMiddleware(AutologinMiddleware):
     def needs_login(self, request, spider):
         return bool(spider.queue.get_login_credentials(request.url))
