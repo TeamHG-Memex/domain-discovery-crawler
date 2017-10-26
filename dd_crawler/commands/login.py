@@ -6,7 +6,8 @@ from scrapy_redis.scheduler import Scheduler
 
 def add_login(spider, url, login, password, queue=None):
     print('Adding login url: {}'.format(url))
-    queue = queue or spider.queue
+    if queue is None:
+        queue = spider.queue
     queue.add_login_credentials(url, login, password)
     # push some known url from this domain to make sure we re-crawl it
     # while logged-in
