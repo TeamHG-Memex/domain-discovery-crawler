@@ -5,6 +5,7 @@ __pycache__
 *.vmprof
 *.log
 *.txt
+!LICENSE.txt
 !requirements.txt
 *.html
 *.csv
